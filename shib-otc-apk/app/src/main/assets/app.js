@@ -88,7 +88,7 @@ function analysis(){
   let baseConfidence=Math.min(96,Math.round(50+raw*.48));if(Math.abs(bull-bear)<14)baseConfidence=Math.min(baseConfidence,69);
   const features=makeFeatures({side,R,hist,px,mid,upper,lower,st,volPct,slope,e9,e21,e50,ts});
   const adapt=adaptiveAdjustment(features),confidence=Math.round(Math.max(45,Math.min(97,baseConfidence+adapt.adjustment)));
-  const exhaustionBlocked=(side==='UP'&&st>=85&&(features.bbPos==='upper'||features.bbPos==='above'))||(side==='DOWN'&&st<=15&&(features.bbPos==='lower'||features.bbPos==='below'));
+  const exhaustionBlocked=(side==='UP'&&st>=90&&R>=70&&(features.bbPos==='upper'||features.bbPos==='above'))||(side==='DOWN'&&st<=10&&R<=30&&(features.bbPos==='lower'||features.bbPos==='below'));
   $('#emaState').textContent=features.emaTrend==='bull'?'Bullish':features.emaTrend==='bear'?'Bearish':'Mixed';
   $('#rsiState').textContent=R.toFixed(1);$('#macdState').textContent=hist>0?'Positive':'Negative';
   $('#bbState').textContent=px>upper?'Above upper':px<lower?'Below lower':px>mid?'Upper half':'Lower half';
