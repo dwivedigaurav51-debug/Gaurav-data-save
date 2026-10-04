@@ -1,11 +1,7 @@
-# SHIB OTC Virtual Signal APK — V6 Loss Diagnostic Lab
+# SHIB OTC Virtual Signal APK — V7 Exhaustion Filter
 
-V6 adds:
-- Loss Diagnostic Lab with one card per completed virtual LOSS
-- Screenshot-friendly Upgrade Code for each loss
-- Saves entry RSI, Stochastic, EMA trend, MACD, Bollinger position, volatility, bull/bear scores and score gap
-- Lists likely weak/conflicting conditions behind each loss
-- Reconstructs recent legacy losses from official SHIB OTC data when the timestamp is still available
-- Keeps official Olymptrade SHIBUSD_OTC feed, repeated virtual trades, countdown, notifications/vibration and Adaptive V3 learning
-- Diagnostic reasons are clues, not guaranteed proof of a single market cause
+V7 changes only the signal eligibility filter:
+- Block UP when Stochastic >= 85 and Bollinger position is upper/above
+- Block DOWN when Stochastic <= 15 and Bollinger position is lower/below
+- Everything else remains unchanged from V6: official SHIBUSD_OTC feed, adaptive learning, virtual trades, countdown, notifications/vibration, history and Loss Diagnostic Lab
 - No real-money orders

@@ -88,12 +88,13 @@ function analysis(){
   let baseConfidence=Math.min(96,Math.round(50+raw*.48));if(Math.abs(bull-bear)<14)baseConfidence=Math.min(baseConfidence,69);
   const features=makeFeatures({side,R,hist,px,mid,upper,lower,st,volPct,slope,e9,e21,e50,ts});
   const adapt=adaptiveAdjustment(features),confidence=Math.round(Math.max(45,Math.min(97,baseConfidence+adapt.adjustment)));
+  const exhaustionBlocked=(side==='UP'&&st>=85&&(features.bbPos==='upper'||features.bbPos==='above'))||(side==='DOWN'&&st<=15&&(features.bbPos==='lower'||features.bbPos==='below'));
   $('#emaState').textContent=features.emaTrend==='bull'?'Bullish':features.emaTrend==='bear'?'Bearish':'Mixed';
   $('#rsiState').textContent=R.toFixed(1);$('#macdState').textContent=hist>0?'Positive':'Negative';
   $('#bbState').textContent=px>upper?'Above upper':px<lower?'Below lower':px>mid?'Upper half':'Lower half';
   $('#stochState').textContent=st.toFixed(1);$('#atrState').textContent=volPct.toFixed(3)+'%';
   $('#regime').textContent=features.regime.toUpperCase();
-  return {score:raw,side,baseConfidence,confidence,adaptiveAdjustment:adapt.adjustment,reason:reasons.join(' • ')+' • '+adapt.evidence,features,bullScore:bull,bearScore:bear,scoreGap:Math.abs(bull-bear)};
+  return {score:raw,side,baseConfidence,confidence,adaptiveAdjustment:adapt.adjustment,reason:reasons.join(' • ')+' • '+adapt.evidence,features,bullScore:bull,bearScore:bear,scoreGap:Math.abs(bull-bear),exhaustionBlocked};
 }
 
 function updateBucket(obj,key,win){if(!key)return;const s=obj[key]||(obj[key]={n:0,w:0,l:0,last:[]});s.n++;if(win)s.w++;else s.l++;s.last.unshift(win?1:0);s.last=s.last.slice(0,20)}
@@ -198,7 +199,7 @@ function backfillLegacyLosses(){
 function evaluateOnNewPoint(){
   if(!state.feedOk||isFeedStale())return;
   const a=analysis(),threshold=Math.max(60,Math.min(95,+$('#threshold').value||78));
-  const p=state.points.at(-1),strong=a.side!=='NONE'&&a.confidence>=threshold&&a.score>=55;
+  const p=state.points.at(-1),strong=a.side!=='NONE'&&!a.exhaustionBlocked&&a.confidence>=threshold&&a.score>=55;
   if(strong&&$('#autoMode').checked&&!state.active&&p){
     const cooldown=Math.max(1,+$('#cooldown').value||1);
     const minGap=cooldown*(state.sourceFrame||300);
@@ -340,7 +341,7 @@ function render(){
   $('#price').textContent=priceText(p);
   const ch=lastRenderedPrice&&p!=null?(p-lastRenderedPrice)/lastRenderedPrice*100:0;if(p!=null)lastRenderedPrice=p;
   $('#priceChange').textContent=(ch>=0?'+':'')+ch.toFixed(3)+'%';
-  const stale=isFeedStale(),threshold=+$('#threshold').value||78,activeSignal=(!stale&&state.feedOk&&a.confidence>=threshold&&a.score>=55)?a.side:'NONE';
+  const stale=isFeedStale(),threshold=+$('#threshold').value||78,activeSignal=(!stale&&state.feedOk&&!a.exhaustionBlocked&&a.confidence>=threshold&&a.score>=55)?a.side:'NONE';
   const s=$('#signal');s.textContent=stale?'NO TRADE • FEED STALE':activeSignal==='NONE'?'NO TRADE':(a.confidence>=88&&state.learning.total>=20?'SUPER STRONG ':'STRONG ')+activeSignal;s.className=activeSignal==='UP'?'up':activeSignal==='DOWN'?'down':'neutral';
   $('#confidence').textContent=`Adaptive ${a.confidence}/100 • Base ${a.baseConfidence}/100`;$('#scoreFill').style.width=a.confidence+'%';$('#reason').textContent=a.reason;
   const action=$('#signalAction');
