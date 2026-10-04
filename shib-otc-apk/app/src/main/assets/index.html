@@ -13,7 +13,7 @@
       <div>
         <div class="eyebrow">PAPER TRADING ONLY</div>
         <h1>SHIB OTC Virtual Signal</h1>
-        <div class="feedline"><span id="feedDot" class="dot"></span><span id="feedStatus">SIMULATED OTC FEED • Running</span></div>
+        <div class="feedline"><span id="feedDot" class="dot"></span><span id="feedStatus">OLYMPTRADE SHIB OTC • Connecting…</span></div>
       </div>
       <button id="resetBtn" class="ghost">Reset</button>
     </header>
@@ -21,7 +21,7 @@
     <section class="hero card">
       <div class="pricebox">
         <span class="muted">SHIB / OTC</span>
-        <strong id="price">0.00001250</strong>
+        <strong id="price">—</strong>
         <small id="priceChange">+0.00%</small>
       </div>
       <div class="signalbox">
@@ -34,13 +34,11 @@
     <section class="card chart-card">
       <div class="row between">
         <div>
-          <h2>Live SHIB OTC Simulator</h2>
-          <small class="muted">Simulated price stream for strategy testing — not Olymptrade live quotes</small>
+          <h2>Olymptrade SHIB OTC Official Feed</h2>
+          <small class="muted">SHIBUSD_OTC public asset feed • current fresh resolution: 5-minute closing-price points</small>
         </div>
-        <select id="timeframe">
-          <option value="60">1m</option>
-          <option value="120" selected>2m</option>
-          <option value="300">5m</option>
+        <select id="timeframe" disabled>
+          <option value="300" selected>5m official</option>
         </select>
       </div>
       <canvas id="chart"></canvas>
@@ -98,8 +96,8 @@
         <div><span>RSI 14</span><b id="rsiState">—</b></div>
         <div><span>MACD</span><b id="macdState">—</b></div>
         <div><span>Bollinger</span><b id="bbState">—</b></div>
-        <div><span>Stochastic</span><b id="stochState">—</b></div>
-        <div><span>ATR / Volatility</span><b id="atrState">—</b></div>
+        <div><span>Close Stochastic</span><b id="stochState">—</b></div>
+        <div><span>Close Volatility</span><b id="atrState">—</b></div>
       </div>
       <div class="scorebar"><i id="scoreFill"></i></div>
       <div id="reason" class="reason">Waiting for enough candles…</div>
@@ -114,10 +112,10 @@
         <div><span>Learned Trades</span><b id="learnedTrades">0</b></div>
         <div><span>Recent 20 Win Rate</span><b id="recentLearnRate">—</b></div>
         <div><span>Current Score Adjust</span><b id="adaptiveDelta">+0.0</b></div>
-        <div><span>Best Learned Pattern</span><b id="bestPattern">Need 5+ similar trades</b></div>
-        <div><span>Weakest Learned Pattern</span><b id="worstPattern">Need 5+ similar trades</b></div>
+        <div><span>Best Learned Pattern</span><b id="bestPattern">Need 20+ similar trades</b></div>
+        <div><span>Weakest Learned Pattern</span><b id="worstPattern">Need 20+ similar trades</b></div>
       </div>
-      <div class="rule">The engine learns only from completed virtual trades. Small samples do not change scores; adaptive adjustment is capped to reduce overfitting.</div>
+      <div class="rule">The engine learns only from completed virtual trades on the Olymptrade-source feed. It waits for 20 similar trades before adapting scores.</div>
     </section>
 
     <section class="card">
@@ -134,7 +132,7 @@
     </section>
 
     <footer>
-      This is a simulation and analysis tool, not a promise of profit. No real-money orders are placed.
+      Paper trading only. Prices are read from Olymptrade's public SHIBUSD_OTC asset feed; no real-money orders are placed.
     </footer>
   </main>
   <script src="app.js"></script>
