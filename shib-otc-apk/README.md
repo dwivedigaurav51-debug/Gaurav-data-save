@@ -1,13 +1,14 @@
-# SHIB OTC Virtual Signal APK
+# SHIB OTC Virtual Signal APK — Adaptive V2
 
-Standalone Android build of the SHIB OTC paper-trading simulator.
+Standalone Android paper-trading simulator for SHIB OTC.
 
-- Simulated SHIB OTC feed
-- Automatic virtual signal entries
-- Signal time and expiry time recorded
-- Automatic WIN/LOSS settlement
-- 90% virtual profit on wins
-- Local history and balance storage
-- No real-money orders
-
-Build: GitHub Actions -> SHIB OTC APK
+Adaptive V2:
+- Stores indicator/pattern context for every virtual signal
+- Learns from completed WIN/LOSS results
+- Reinforces historically stronger setups
+- Reduces confidence for weak recurring setups
+- Requires minimum sample sizes before changing score
+- Caps adaptive score changes to reduce overfitting
+- Shows Base Score vs Adaptive Score
+- Tracks recent learning win rate and learned pattern stats
+- No Martingale and no real-money orders

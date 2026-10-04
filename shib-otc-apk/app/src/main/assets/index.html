@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
   <meta name="theme-color" content="#08101f"/>
   <title>SHIB OTC Virtual Signal</title>
-  <link rel="manifest" href="/manifest.json"/>
   <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
@@ -108,12 +107,27 @@
 
     <section class="card">
       <div class="row between">
+        <h2>Adaptive Learning V2</h2>
+        <span id="engineMode" class="pill">LEARNING</span>
+      </div>
+      <div class="learning-grid">
+        <div><span>Learned Trades</span><b id="learnedTrades">0</b></div>
+        <div><span>Recent 20 Win Rate</span><b id="recentLearnRate">—</b></div>
+        <div><span>Current Score Adjust</span><b id="adaptiveDelta">+0.0</b></div>
+        <div><span>Best Learned Pattern</span><b id="bestPattern">Need 5+ similar trades</b></div>
+        <div><span>Weakest Learned Pattern</span><b id="worstPattern">Need 5+ similar trades</b></div>
+      </div>
+      <div class="rule">The engine learns only from completed virtual trades. Small samples do not change scores; adaptive adjustment is capped to reduce overfitting.</div>
+    </section>
+
+    <section class="card">
+      <div class="row between">
         <h2>Virtual Trade History</h2>
         <button id="clearHistory" class="ghost">Clear</button>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Signal Time</th><th>Expiry Time</th><th>Side</th><th>Entry</th><th>Exit</th><th>Stake</th><th>Status</th><th>P/L</th></tr></thead>
+          <thead><tr><th>Signal Time</th><th>Expiry Time</th><th>Side</th><th>Entry</th><th>Exit</th><th>Stake</th><th>Score</th><th>Status</th><th>P/L</th><th>Learning Note</th></tr></thead>
           <tbody id="history"></tbody>
         </table>
       </div>
