@@ -93,12 +93,107 @@ function analysis(){
   $('#bbState').textContent=px>upper?'Above upper':px<lower?'Below lower':px>mid?'Upper half':'Lower half';
   $('#stochState').textContent=st.toFixed(1);$('#atrState').textContent=volPct.toFixed(3)+'%';
   $('#regime').textContent=features.regime.toUpperCase();
-  return {score:raw,side,baseConfidence,confidence,adaptiveAdjustment:adapt.adjustment,reason:reasons.join(' • ')+' • '+adapt.evidence,features};
+  return {score:raw,side,baseConfidence,confidence,adaptiveAdjustment:adapt.adjustment,reason:reasons.join(' • ')+' • '+adapt.evidence,features,bullScore:bull,bearScore:bear,scoreGap:Math.abs(bull-bear)};
 }
 
 function updateBucket(obj,key,win){if(!key)return;const s=obj[key]||(obj[key]={n:0,w:0,l:0,last:[]});s.n++;if(win)s.w++;else s.l++;s.last.unshift(win?1:0);s.last=s.last.slice(0,20)}
 function learnFromTrade(t,win){const f=t.features;if(!f)return;state.learning.total++;updateBucket(state.learning.patterns,f.patternKey,win);for(const tag of f.tags||[])updateBucket(state.learning.tags,tag,win);state.learning.recent.unshift({time:Date.now(),win:!!win,side:t.side,patternKey:f.patternKey});state.learning.recent=state.learning.recent.slice(0,50)}
 function lossReason(t){const f=t.features;if(!f)return 'Pattern underperformed';const p=[];if(f.regime==='highvol'||f.volBand==='extreme')p.push('High volatility');if(f.emaTrend==='mixed')p.push('Mixed EMA trend');if(t.side==='UP'&&f.macd==='neg')p.push('MACD conflict');if(t.side==='DOWN'&&f.macd==='pos')p.push('MACD conflict');if(t.side==='UP'&&f.rsiBand==='high')p.push('RSI too high');if(t.side==='DOWN'&&f.rsiBand==='low')p.push('RSI too low');if(!p.length)p.push('Similar setup needs lower weight');return p.slice(0,2).join(' + ')}
+
+function diagnosticCode(t){
+  const f=t.features||{};
+  const side=t.side==='UP'?'U':'D';
+  const ema=f.emaTrend==='bull'?'B':f.emaTrend==='bear'?'R':'X';
+  const macd=f.macd==='pos'?'P':'N';
+  const bb=f.bbPos==='above'?'A':f.bbPos==='below'?'B':f.bbPos==='upper'?'U':'L';
+  const vol=f.volBand==='extreme'?'X':f.volBand==='active'?'A':f.volBand==='normal'?'N':'D';
+  const r=Math.round(Number(f.R||0)),s=Math.round(Number(f.st||0));
+  const gap=Math.round(Number(t.scoreGap||Math.abs(Number(t.bullScore||0)-Number(t.bearScore||0))));
+  return 'LD-'+String(t.sourceTs||0).slice(-6)+'-'+side+'-R'+String(r).padStart(2,'0')+'-S'+String(s).padStart(2,'0')+'-E'+ema+'-M'+macd+'-B'+bb+'-V'+vol+'-G'+gap;
+}
+
+function diagnoseLoss(t,exit){
+  const f=t.features||{},flags=[],reasons=[];
+  if(t.side==='DOWN'){
+    if(Number(f.R)<=35){flags.push('R-LOW');reasons.push('RSI was already low/oversold, so reversal risk was elevated')}
+    if(Number(f.st)<=20){flags.push('S-LOW');reasons.push('Stochastic was extremely low, suggesting the DOWN move may have been stretched')}
+    if(f.macd==='pos'){flags.push('M-CONTRA');reasons.push('MACD momentum was positive against the DOWN trade')}
+    if(f.emaTrend!=='bear'){flags.push('E-WEAK');reasons.push('EMA structure was not fully bearish')}
+    if(f.bbPos==='below'){flags.push('BB-EXTREME');reasons.push('Entry was below the lower Bollinger area, increasing bounce risk')}
+  }else{
+    if(Number(f.R)>=65){flags.push('R-HIGH');reasons.push('RSI was already high/overbought, so pullback risk was elevated')}
+    if(Number(f.st)>=80){flags.push('S-HIGH');reasons.push('Stochastic was extremely high, suggesting the UP move may have been stretched')}
+    if(f.macd==='neg'){flags.push('M-CONTRA');reasons.push('MACD momentum was negative against the UP trade')}
+    if(f.emaTrend!=='bull'){flags.push('E-WEAK');reasons.push('EMA structure was not fully bullish')}
+    if(f.bbPos==='above'){flags.push('BB-EXTREME');reasons.push('Entry was above the upper Bollinger area, increasing pullback risk')}
+  }
+  if(f.regime==='highvol'||f.volBand==='extreme'){flags.push('V-HIGH');reasons.push('Volatility was unusually high, which can invalidate short-expiry setups')}
+  if(Number(t.scoreGap||0)<20){flags.push('G-LOW');reasons.push('Bull/Bear score gap was small, so directional conviction was weak')}
+  if(!flags.length){flags.push('PATTERN');reasons.push('No single conflict dominated; this pattern needs more samples before adding a new filter')}
+  const movePct=t.entry?((Number(exit)-Number(t.entry))/Number(t.entry))*100:0;
+  return {
+    code:diagnosticCode(t),
+    flags,
+    reason:reasons.slice(0,3).join(' • '),
+    movePct:+movePct.toFixed(3),
+    snapshot:{
+      side:t.side,
+      confidence:t.confidence,
+      baseConfidence:t.baseConfidence,
+      bullScore:t.bullScore,
+      bearScore:t.bearScore,
+      scoreGap:t.scoreGap,
+      rsi:Number(f.R||0),
+      stochastic:Number(f.st||0),
+      emaTrend:f.emaTrend||'unknown',
+      macd:f.macd||'unknown',
+      bbPos:f.bbPos||'unknown',
+      volatility:f.volBand||'unknown',
+      regime:f.regime||'unknown',
+      slope:Number(f.slope||0)
+    }
+  };
+}
+
+function reconstructLegacyLoss(row){
+  const targetTs=Math.floor(Number(row.signalTime||0)/1000);
+  const idx=state.points.findIndex(p=>p.ts===targetTs);
+  if(idx<54||row.exit==null)return null;
+  const closes=state.points.slice(0,idx+1).map(x=>x.c),ts=targetTs*1000;
+  const e9=ema(closes.slice(-80),9),e21=ema(closes.slice(-80),21),e50=ema(closes.slice(-100),50);
+  const R=rsi(closes),fast=ema(closes.slice(-60),12),slow=ema(closes.slice(-60),26),mac=fast-slow;
+  const macSeries=[];for(let i=Math.max(30,closes.length-20);i<=closes.length;i++){const a=closes.slice(0,i);macSeries.push(ema(a.slice(-60),12)-ema(a.slice(-60),26))}
+  const hist=mac-ema(macSeries,9),mid=sma(closes,20),dev=sd(closes,20),upper=mid+2*dev,lower=mid-2*dev,px=closes.at(-1);
+  const st=closeStoch(closes),vol=closeVolatility(closes),volPct=vol/px*100,slope=(e9-e21)/px*100;
+  let bull=0,bear=0;
+  if(e9>e21&&e21>e50)bull+=25;else if(e9<e21&&e21<e50)bear+=25;
+  if(R>=52&&R<=72)bull+=14;if(R<=48&&R>=28)bear+=14;
+  if(hist>0)bull+=17;else bear+=17;
+  if(px>mid&&px<upper)bull+=10;if(px<mid&&px>lower)bear+=10;
+  if(st>55&&st<88)bull+=10;if(st<45&&st>12)bear+=10;
+  if(slope>.08)bull+=12;else if(slope<-.08)bear+=12;
+  if(volPct>.02&&volPct<1.2){if(bull>bear)bull+=12;else bear+=12}
+  const side=row.side|| (bull>bear?'UP':bear>bull?'DOWN':'NONE');
+  const features=makeFeatures({side,R,hist,px,mid,upper,lower,st,volPct,slope,e9,e21,e50,ts});
+  const t={
+    side,entry:row.entry,confidence:row.confidence,baseConfidence:row.baseConfidence,
+    bullScore:bull,bearScore:bear,scoreGap:Math.abs(bull-bear),features,sourceTs:targetTs
+  };
+  return {diagnostic:diagnoseLoss(t,row.exit),t};
+}
+
+function backfillLegacyLosses(){
+  let changed=false;
+  for(const row of state.history){
+    if(row.result!=='LOSS'||row.lossDiagnostic)continue;
+    const rebuilt=reconstructLegacyLoss(row);
+    if(!rebuilt)continue;
+    row.lossDiagnostic=rebuilt.diagnostic;row.lossCode=rebuilt.diagnostic.code;
+    row.features=rebuilt.t.features;row.bullScore=rebuilt.t.bullScore;row.bearScore=rebuilt.t.bearScore;row.scoreGap=rebuilt.t.scoreGap;
+    changed=true;
+  }
+  return changed;
+}
 
 function evaluateOnNewPoint(){
   if(!state.feedOk||isFeedStale())return;
@@ -114,8 +209,8 @@ function openTrade(a){
   let stake=Math.max(10,+$('#stake').value||100);stake=Math.min(stake,state.balance);if(stake<10)return;
   const p=state.points.at(-1),openedAt=p.ts*1000,expirySec=state.sourceFrame||300,expiresAt=openedAt+expirySec*1000;
   const tradeId='OT-'+p.ts;state.balance-=stake;
-  state.active={tradeId,side:a.side,entry:p.c,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,features:a.features,openedAt,expiresAt,sourceTs:p.ts};
-  state.history.unshift({tradeId,signalTime:openedAt,expiryTime:expiresAt,side:a.side,entry:p.c,exit:null,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,patternKey:a.features?.patternKey||'',result:'OPEN',pnl:null,learningNote:'TRADE TAKEN • waiting for official 5m expiry'});
+  state.active={tradeId,side:a.side,entry:p.c,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,features:a.features,bullScore:a.bullScore,bearScore:a.bearScore,scoreGap:a.scoreGap,openedAt,expiresAt,sourceTs:p.ts};
+  state.history.unshift({tradeId,signalTime:openedAt,expiryTime:expiresAt,side:a.side,entry:p.c,exit:null,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,bullScore:a.bullScore,bearScore:a.bearScore,scoreGap:a.scoreGap,features:a.features,patternKey:a.features?.patternKey||'',result:'OPEN',pnl:null,learningNote:'TRADE TAKEN • waiting for official 5m expiry'});
   state.history=state.history.slice(0,200);state.lastTradeTs=p.ts;state.lastSignalTs=p.ts;save();
   sendAlert('SHIB OTC • Virtual Trade Taken',sideText(a.side)+' • Entry '+priceText(p.c)+' • ₹'+stake+' • Expiry '+new Date(expiresAt).toLocaleTimeString());
 }
@@ -128,7 +223,11 @@ function settleFromOfficialPoints(){
   if(win){state.balance+=t.stake*1.9;pnl=t.stake*.9;state.wins++}else{pnl=-t.stake;state.losses++}
   learnFromTrade(t,win);
   const row=state.history.find(x=>x.tradeId===t.tradeId),note=win?'Winning setup reinforced':lossReason(t);
-  if(row){row.exit=exit;row.result=win?'WIN':'LOSS';row.pnl=pnl;row.settledAt=exitPoint.ts*1000;row.learningNote=note}
+  const diagnostic=win?null:diagnoseLoss(t,exit);
+  if(row){
+    row.exit=exit;row.result=win?'WIN':'LOSS';row.pnl=pnl;row.settledAt=exitPoint.ts*1000;row.learningNote=note;
+    if(diagnostic){row.lossDiagnostic=diagnostic;row.lossCode=diagnostic.code}
+  }
   sendAlert('SHIB OTC • '+(win?'WIN ✅':'LOSS ❌'),sideText(t.side)+' • Exit '+priceText(exit)+' • '+(pnl>=0?'+':'')+'₹'+pnl.toFixed(0));
   state.active=null;save();
 }
@@ -173,6 +272,7 @@ async function fetchOfficial(){
     state.points=incoming.slice(-400);state.price=state.points.at(-1).c;state.lastSourceTs=state.points.at(-1).ts;
     state.sourceFrame=Number(d.candle_frame||300);state.sourceTitle=d.chart_title||'1D';state.precision=Number(d.precision??4);state.lastFetchAt=Date.now();state.feedError='';
     state.feedOk=!isFeedStale();
+    backfillLegacyLosses();
     settleFromOfficialPoints();
     if(state.lastSourceTs!==prevLast){
       state.lastProcessedTs=state.lastSourceTs;
@@ -206,6 +306,34 @@ function sendAlert(title,body){
   }catch(e){}
 }
 function renderLearning(a){const rw=recentWinRate(),bw=bestWorstPattern();$('#learnedTrades').textContent=state.learning.total;$('#recentLearnRate').textContent=rw==null?'—':Math.round(rw*100)+'%';$('#adaptiveDelta').textContent=(a.adaptiveAdjustment>=0?'+':'')+a.adaptiveAdjustment.toFixed(1);$('#adaptiveDelta').className=a.adaptiveAdjustment>0?'up':a.adaptiveAdjustment<0?'down':'neutral';$('#bestPattern').textContent=bw.best?Math.round(bw.best.wr*100)+'% • '+bw.best.n+' trades':'Need 20+ similar trades';$('#worstPattern').textContent=bw.worst?Math.round(bw.worst.wr*100)+'% • '+bw.worst.n+' trades':'Need 20+ similar trades';$('#engineMode').textContent=state.learning.total<20?'LEARNING':state.learning.total<50?'ADAPTING':'ADAPTIVE V3'}
+
+function renderLossDiagnostics(){
+  const losses=state.history.filter(x=>x.result==='LOSS');
+  $('#lossCount').textContent=losses.length+' LOSS'+(losses.length===1?'':'ES');
+  if(!losses.length){
+    $('#lossDiagnostics').innerHTML='<div class="loss-empty">No diagnosed losses yet.</div>';
+    return;
+  }
+  $('#lossDiagnostics').innerHTML=losses.map((x,i)=>{
+    const d=x.lossDiagnostic;
+    if(!d){
+      return `<div class="loss-item">
+        <div class="loss-head"><b>LOSS #${losses.length-i} • ${sideText(x.side)}</b><span class="down">₹-${Number(x.stake||0).toFixed(0)}</span></div>
+        <div class="loss-meta">${new Date(x.signalTime).toLocaleString()} • Entry ${priceText(x.entry)} → Exit ${priceText(x.exit)}</div>
+        <div class="loss-code">LEGACY-${x.tradeId||'LOSS'} • detailed snapshot unavailable</div>
+        <div class="loss-reason">This trade was recorded before Loss Diagnostic Lab started saving full entry conditions.</div>
+      </div>`;
+    }
+    const s=d.snapshot||{};
+    return `<div class="loss-item">
+      <div class="loss-head"><b>LOSS #${losses.length-i} • ${sideText(x.side)}</b><span class="down">₹-${Number(x.stake||0).toFixed(0)}</span></div>
+      <div class="loss-meta">${new Date(x.signalTime).toLocaleString()} • Entry ${priceText(x.entry)} → Exit ${priceText(x.exit)} • Score ${Math.round(x.confidence||0)}</div>
+      <div class="loss-code">${d.code}</div>
+      <div class="loss-reason"><b>Likely weakness:</b> ${d.reason}</div>
+      <div class="loss-meta">Flags: ${(d.flags||[]).join(', ')} • RSI ${Number(s.rsi||0).toFixed(1)} • Stoch ${Number(s.stochastic||0).toFixed(1)} • EMA ${s.emaTrend||'—'} • MACD ${s.macd||'—'} • BB ${s.bbPos||'—'} • Vol ${s.volatility||'—'} • Bull/Bear ${Math.round(Number(s.bullScore||0))}/${Math.round(Number(s.bearScore||0))} • Gap ${Math.round(Number(s.scoreGap||0))}</div>
+    </div>`;
+  }).join('');
+}
 
 function render(){
   const a=analysis(),p=state.price;
@@ -243,6 +371,7 @@ function render(){
   }else{$('#activeTrade').textContent='None';$('#activeTrade').className='';$('#tradeTimer').textContent='Waiting for next eligible strong signal'}
   const n=state.wins+state.losses;$('#winRate').textContent=(n?Math.round(state.wins/n*100):0)+'%';$('#record').textContent=state.wins+'W • '+state.losses+'L';renderLearning(a);
   $('#history').innerHTML=state.history.map(x=>{const isOpen=x.result==='OPEN',resultClass=isOpen?'neutral':x.result==='WIN'?'up':'down',exitText=x.exit==null?'—':priceText(x.exit),pnlText=x.pnl==null?'—':(x.pnl>=0?'+':'')+'₹'+Number(x.pnl).toFixed(0),pnlClass=x.pnl==null?'neutral':x.pnl>=0?'up':'down';return `<tr><td>${new Date(x.signalTime).toLocaleTimeString()}</td><td>${new Date(x.expiryTime).toLocaleTimeString()}</td><td class="${x.side==='UP'?'up':'down'}">${sideText(x.side)}</td><td>${priceText(x.entry)}</td><td>${exitText}</td><td>₹${Number(x.stake).toFixed(0)}</td><td>${Math.round(x.confidence||0)}</td><td class="${resultClass}">${isOpen?'⏳ OPEN':x.result}</td><td class="${pnlClass}">${pnlText}</td><td class="muted">${x.learningNote||'—'}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">No official-feed virtual signals recorded yet</td></tr>';
+  renderLossDiagnostics();
   drawChart();
 }
 
