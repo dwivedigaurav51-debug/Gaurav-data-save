@@ -1,4 +1,4 @@
 plugins { id 'com.android.application' }
 android { namespace 'com.gaurav.signalscanner'; compileSdk 35
- defaultConfig { applicationId 'com.gaurav.signalscanner'; minSdk 24; targetSdk 35; versionCode 19; versionName '1.19' }
+ defaultConfig { applicationId 'com.gaurav.signalscanner'; minSdk 24; targetSdk 35; versionCode 22; versionName '1.22' }
 }
