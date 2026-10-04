@@ -9,7 +9,7 @@ function freshState(){
     balance:10000,startBalance:10000,wins:0,losses:0,history:[],
     active:null,lastTradeTs:0,lastProcessedTs:0,lastSignalTs:0,
     price:null,points:[],sourceFrame:300,sourceTitle:'1D',lastFetchAt:0,lastSourceTs:0,
-    feedOk:false,feedError:'',precision:4,
+    feedOk:false,feedError:'',precision:4,alertsEnabled:true,
     learning:{version:3,total:0,patterns:{},tags:{},recent:[]}
   };
 }
@@ -19,7 +19,7 @@ try{saved=JSON.parse(localStorage.getItem('shibPaperState')||'null')}catch{}
 let state=(saved&&saved.feedVersion===FEED_VERSION)?saved:freshState();
 state.learning=state.learning||{version:3,total:0,patterns:{},tags:{},recent:[]};
 state.learning.version=3;state.learning.patterns=state.learning.patterns||{};state.learning.tags=state.learning.tags||{};state.learning.recent=state.learning.recent||[];
-state.history=state.history||[];state.points=state.points||[];state.lastTradeTs=Number(state.lastTradeTs||0);
+state.history=state.history||[];state.points=state.points||[];state.lastTradeTs=Number(state.lastTradeTs||0);state.alertsEnabled=state.alertsEnabled!==false;
 if(!state.lastTradeTs&&state.history.length){
   state.lastTradeTs=Math.max(0,...state.history.map(x=>Math.floor(Number(x.signalTime||0)/1000)).filter(Number.isFinite));
 }
@@ -117,6 +117,7 @@ function openTrade(a){
   state.active={tradeId,side:a.side,entry:p.c,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,features:a.features,openedAt,expiresAt,sourceTs:p.ts};
   state.history.unshift({tradeId,signalTime:openedAt,expiryTime:expiresAt,side:a.side,entry:p.c,exit:null,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,patternKey:a.features?.patternKey||'',result:'OPEN',pnl:null,learningNote:'TRADE TAKEN • waiting for official 5m expiry'});
   state.history=state.history.slice(0,200);state.lastTradeTs=p.ts;state.lastSignalTs=p.ts;save();
+  sendAlert('SHIB OTC • Virtual Trade Taken',sideText(a.side)+' • Entry '+priceText(p.c)+' • ₹'+stake+' • Expiry '+new Date(expiresAt).toLocaleTimeString());
 }
 function settleFromOfficialPoints(){
   const t=state.active;if(!t)return;
@@ -128,6 +129,7 @@ function settleFromOfficialPoints(){
   learnFromTrade(t,win);
   const row=state.history.find(x=>x.tradeId===t.tradeId),note=win?'Winning setup reinforced':lossReason(t);
   if(row){row.exit=exit;row.result=win?'WIN':'LOSS';row.pnl=pnl;row.settledAt=exitPoint.ts*1000;row.learningNote=note}
+  sendAlert('SHIB OTC • '+(win?'WIN ✅':'LOSS ❌'),sideText(t.side)+' • Exit '+priceText(exit)+' • '+(pnl>=0?'+':'')+'₹'+pnl.toFixed(0));
   state.active=null;save();
 }
 
@@ -193,6 +195,16 @@ function countdownText(expiresAt){
   const m=String(Math.floor(sec/60)).padStart(2,'0'),s=String(sec%60).padStart(2,'0');
   return m+':'+s;
 }
+function sendAlert(title,body){
+  if(!state.alertsEnabled)return;
+  try{
+    if(window.AndroidBridge&&typeof window.AndroidBridge.notifyEvent==='function'){
+      window.AndroidBridge.notifyEvent(String(title),String(body));
+    }else if(navigator.vibrate){
+      navigator.vibrate([250,120,250]);
+    }
+  }catch(e){}
+}
 function renderLearning(a){const rw=recentWinRate(),bw=bestWorstPattern();$('#learnedTrades').textContent=state.learning.total;$('#recentLearnRate').textContent=rw==null?'—':Math.round(rw*100)+'%';$('#adaptiveDelta').textContent=(a.adaptiveAdjustment>=0?'+':'')+a.adaptiveAdjustment.toFixed(1);$('#adaptiveDelta').className=a.adaptiveAdjustment>0?'up':a.adaptiveAdjustment<0?'down':'neutral';$('#bestPattern').textContent=bw.best?Math.round(bw.best.wr*100)+'% • '+bw.best.n+' trades':'Need 20+ similar trades';$('#worstPattern').textContent=bw.worst?Math.round(bw.worst.wr*100)+'% • '+bw.worst.n+' trades':'Need 20+ similar trades';$('#engineMode').textContent=state.learning.total<20?'LEARNING':state.learning.total<50?'ADAPTING':'ADAPTIVE V3'}
 
 function render(){
@@ -221,6 +233,7 @@ function render(){
   const dot=$('#feedDot'),fs=$('#feedStatus');
   if(state.feedOk&&!stale){dot.style.background='#33d17a';fs.textContent=`OLYMPTRADE SHIB OTC • official public feed • ${Math.round(state.sourceFrame/60)}m • ${new Date(state.lastSourceTs*1000).toLocaleTimeString()}`}
   else{dot.style.background='#ff667e';fs.textContent='OLYMPTRADE FEED • '+(state.feedError||'STALE / waiting')}
+  $('#alertsToggle').checked=state.alertsEnabled;
   $('#balance').textContent=fmt(state.balance);const pnl=state.balance-state.startBalance+(state.active?state.active.stake:0);$('#pnl').textContent='P/L '+fmt(pnl);
   if(state.active){
     $('#activeTrade').textContent=sideText(state.active.side)+' • ₹'+state.active.stake;
@@ -244,5 +257,15 @@ function drawChart(){
 $('#resetBtn').onclick=()=>{if(confirm('Reset official-feed virtual balance, history and adaptive learning?')){state=freshState();save();render();fetchOfficial()}};
 $('#clearHistory').onclick=()=>{state.history=[];state.wins=0;state.losses=0;save();render()};
 ['stake','threshold','cooldown','autoMode'].forEach(id=>$('#'+id).addEventListener('change',()=>{save();render()}));
+$('#alertsToggle').addEventListener('change',()=>{
+  state.alertsEnabled=$('#alertsToggle').checked;
+  if(state.alertsEnabled&&window.AndroidBridge&&typeof window.AndroidBridge.requestAlertsPermission==='function'){
+    try{window.AndroidBridge.requestAlertsPermission()}catch(e){}
+  }
+  save();render();
+});
 window.addEventListener('resize',drawChart);
+if(state.alertsEnabled&&window.AndroidBridge&&typeof window.AndroidBridge.requestAlertsPermission==='function'){
+  try{window.AndroidBridge.requestAlertsPermission()}catch(e){}
+}
 render();fetchOfficial();setInterval(fetchOfficial,10000);setInterval(()=>{if(state.active)render()},1000);

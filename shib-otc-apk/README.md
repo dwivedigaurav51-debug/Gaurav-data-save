@@ -1,14 +1,9 @@
-# SHIB OTC Virtual Signal APK — Official Feed V4
+# SHIB OTC Virtual Signal APK — V5 Alerts
 
-Standalone Android paper-trading app for SHIB OTC.
-
-V4 fixes:
-- Fixed one-trade-only cooldown bug by using official candle timestamps instead of array indexes
-- Can take a new virtual trade on each eligible new official 5-minute candle
-- Shows VIRTUAL TRADE TAKEN immediately with UP/BUY or DOWN/SELL, stake and entry
-- Shows a live MM:SS expiry countdown
-- History records OPEN immediately and updates the same row to WIN/LOSS at official expiry
-- Default cooldown is 1 candle
-- Uses Olymptrade public SHIBUSD_OTC data only; no simulated fallback
-- Adaptive learning still waits for 20 similar completed trades before changing signal score
+V5 adds:
+- Notification + vibration alert when a virtual trade is taken
+- Notification + vibration on WIN or LOSS at expiry
+- Alerts ON/OFF toggle in the app
+- Android 13+ notification permission request
+- Keeps official Olymptrade SHIBUSD_OTC source, repeated virtual trades, live countdown, history and Adaptive V3 learning
 - No real-money orders
