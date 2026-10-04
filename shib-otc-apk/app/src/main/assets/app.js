@@ -7,7 +7,7 @@ function freshState(){
   return {
     feedVersion:FEED_VERSION,
     balance:10000,startBalance:10000,wins:0,losses:0,history:[],
-    active:null,lastTradeIndex:-999,lastProcessedTs:0,lastSignalTs:0,
+    active:null,lastTradeTs:0,lastProcessedTs:0,lastSignalTs:0,
     price:null,points:[],sourceFrame:300,sourceTitle:'1D',lastFetchAt:0,lastSourceTs:0,
     feedOk:false,feedError:'',precision:4,
     learning:{version:3,total:0,patterns:{},tags:{},recent:[]}
@@ -19,7 +19,10 @@ try{saved=JSON.parse(localStorage.getItem('shibPaperState')||'null')}catch{}
 let state=(saved&&saved.feedVersion===FEED_VERSION)?saved:freshState();
 state.learning=state.learning||{version:3,total:0,patterns:{},tags:{},recent:[]};
 state.learning.version=3;state.learning.patterns=state.learning.patterns||{};state.learning.tags=state.learning.tags||{};state.learning.recent=state.learning.recent||[];
-state.history=state.history||[];state.points=state.points||[];
+state.history=state.history||[];state.points=state.points||[];state.lastTradeTs=Number(state.lastTradeTs||0);
+if(!state.lastTradeTs&&state.history.length){
+  state.lastTradeTs=Math.max(0,...state.history.map(x=>Math.floor(Number(x.signalTime||0)/1000)).filter(Number.isFinite));
+}
 
 let lastRenderedPrice=state.price||0;
 let fetching=false;
@@ -100,20 +103,20 @@ function lossReason(t){const f=t.features;if(!f)return 'Pattern underperformed';
 function evaluateOnNewPoint(){
   if(!state.feedOk||isFeedStale())return;
   const a=analysis(),threshold=Math.max(60,Math.min(95,+$('#threshold').value||78));
-  const currentIndex=state.points.length-1;
-  const strong=a.side!=='NONE'&&a.confidence>=threshold&&a.score>=55;
-  if(strong&&$('#autoMode').checked&&!state.active){
-    const cooldown=+$('#cooldown').value||2;
-    if(currentIndex-state.lastTradeIndex>=cooldown)openTrade(a,currentIndex);
+  const p=state.points.at(-1),strong=a.side!=='NONE'&&a.confidence>=threshold&&a.score>=55;
+  if(strong&&$('#autoMode').checked&&!state.active&&p){
+    const cooldown=Math.max(1,+$('#cooldown').value||1);
+    const minGap=cooldown*(state.sourceFrame||300);
+    if(!state.lastTradeTs||p.ts-state.lastTradeTs>=minGap)openTrade(a);
   }
 }
-function openTrade(a,index){
+function openTrade(a){
   let stake=Math.max(10,+$('#stake').value||100);stake=Math.min(stake,state.balance);if(stake<10)return;
   const p=state.points.at(-1),openedAt=p.ts*1000,expirySec=state.sourceFrame||300,expiresAt=openedAt+expirySec*1000;
-  const tradeId='OT-'+p.ts+'-'+index;state.balance-=stake;
+  const tradeId='OT-'+p.ts;state.balance-=stake;
   state.active={tradeId,side:a.side,entry:p.c,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,features:a.features,openedAt,expiresAt,sourceTs:p.ts};
-  state.history.unshift({tradeId,signalTime:openedAt,expiryTime:expiresAt,side:a.side,entry:p.c,exit:null,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,patternKey:a.features?.patternKey||'',result:'OPEN',pnl:null,learningNote:'Waiting for official next 5m result'});
-  state.history=state.history.slice(0,200);state.lastTradeIndex=index;state.lastSignalTs=p.ts;save();
+  state.history.unshift({tradeId,signalTime:openedAt,expiryTime:expiresAt,side:a.side,entry:p.c,exit:null,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,patternKey:a.features?.patternKey||'',result:'OPEN',pnl:null,learningNote:'TRADE TAKEN • waiting for official 5m expiry'});
+  state.history=state.history.slice(0,200);state.lastTradeTs=p.ts;state.lastSignalTs=p.ts;save();
 }
 function settleFromOfficialPoints(){
   const t=state.active;if(!t)return;
@@ -184,6 +187,12 @@ function recentWinRate(){const a=state.learning.recent.slice(0,20);if(!a.length)
 function bestWorstPattern(){const arr=Object.entries(state.learning.patterns).filter(([,s])=>s.n>=20).map(([k,s])=>({k,...s,wr:s.w/s.n}));arr.sort((a,b)=>b.wr-a.wr||b.n-a.n);return {best:arr[0]||null,worst:arr.length?arr[arr.length-1]:null}}
 function save(){localStorage.setItem('shibPaperState',JSON.stringify(state))}
 function priceText(v){if(v==null)return '—';return Number(v).toFixed(Math.max(4,state.precision||4))}
+function sideText(side){return side==='UP'?'UP / BUY':'DOWN / SELL'}
+function countdownText(expiresAt){
+  const sec=Math.max(0,Math.ceil((Number(expiresAt)-Date.now())/1000));
+  const m=String(Math.floor(sec/60)).padStart(2,'0'),s=String(sec%60).padStart(2,'0');
+  return m+':'+s;
+}
 function renderLearning(a){const rw=recentWinRate(),bw=bestWorstPattern();$('#learnedTrades').textContent=state.learning.total;$('#recentLearnRate').textContent=rw==null?'—':Math.round(rw*100)+'%';$('#adaptiveDelta').textContent=(a.adaptiveAdjustment>=0?'+':'')+a.adaptiveAdjustment.toFixed(1);$('#adaptiveDelta').className=a.adaptiveAdjustment>0?'up':a.adaptiveAdjustment<0?'down':'neutral';$('#bestPattern').textContent=bw.best?Math.round(bw.best.wr*100)+'% • '+bw.best.n+' trades':'Need 20+ similar trades';$('#worstPattern').textContent=bw.worst?Math.round(bw.worst.wr*100)+'% • '+bw.worst.n+' trades':'Need 20+ similar trades';$('#engineMode').textContent=state.learning.total<20?'LEARNING':state.learning.total<50?'ADAPTING':'ADAPTIVE V3'}
 
 function render(){
@@ -194,13 +203,33 @@ function render(){
   const stale=isFeedStale(),threshold=+$('#threshold').value||78,activeSignal=(!stale&&state.feedOk&&a.confidence>=threshold&&a.score>=55)?a.side:'NONE';
   const s=$('#signal');s.textContent=stale?'NO TRADE • FEED STALE':activeSignal==='NONE'?'NO TRADE':(a.confidence>=88&&state.learning.total>=20?'SUPER STRONG ':'STRONG ')+activeSignal;s.className=activeSignal==='UP'?'up':activeSignal==='DOWN'?'down':'neutral';
   $('#confidence').textContent=`Adaptive ${a.confidence}/100 • Base ${a.baseConfidence}/100`;$('#scoreFill').style.width=a.confidence+'%';$('#reason').textContent=a.reason;
+  const action=$('#signalAction');
+  if(state.active){
+    action.textContent=`✅ VIRTUAL TRADE TAKEN • ${sideText(state.active.side)} • ₹${state.active.stake} • Entry ${priceText(state.active.entry)}`;
+    action.className=state.active.side==='UP'?'up':'down';
+  }else if(stale){
+    action.textContent='No trade taken • feed stale';
+    action.className='muted';
+  }else if(activeSignal!=='NONE'){
+    const cd=Math.max(1,+$('#cooldown').value||1),eligibleAfter=state.lastTradeTs+cd*(state.sourceFrame||300);
+    action.textContent=state.lastTradeTs&&state.lastSourceTs<eligibleAfter?'Strong signal active • waiting for next eligible official candle':'Strong signal ready • waiting for new official candle';
+    action.className='muted';
+  }else{
+    action.textContent='No virtual trade taken on this candle';
+    action.className='muted';
+  }
   const dot=$('#feedDot'),fs=$('#feedStatus');
   if(state.feedOk&&!stale){dot.style.background='#33d17a';fs.textContent=`OLYMPTRADE SHIB OTC • official public feed • ${Math.round(state.sourceFrame/60)}m • ${new Date(state.lastSourceTs*1000).toLocaleTimeString()}`}
   else{dot.style.background='#ff667e';fs.textContent='OLYMPTRADE FEED • '+(state.feedError||'STALE / waiting')}
   $('#balance').textContent=fmt(state.balance);const pnl=state.balance-state.startBalance+(state.active?state.active.stake:0);$('#pnl').textContent='P/L '+fmt(pnl);
-  if(state.active){$('#activeTrade').textContent=state.active.side+' ₹'+state.active.stake;$('#activeTrade').className=state.active.side==='UP'?'up':'down';$('#tradeTimer').textContent='expires '+new Date(state.active.expiresAt).toLocaleTimeString()+' • official 5m close'}else{$('#activeTrade').textContent='None';$('#activeTrade').className='';$('#tradeTimer').textContent='Waiting for strong official-feed setup'}
+  if(state.active){
+    $('#activeTrade').textContent=sideText(state.active.side)+' • ₹'+state.active.stake;
+    $('#activeTrade').className=state.active.side==='UP'?'up':'down';
+    const left=countdownText(state.active.expiresAt);
+    $('#tradeTimer').textContent=(left==='00:00'?'00:00 • waiting official close':left+' left')+' • expires '+new Date(state.active.expiresAt).toLocaleTimeString();
+  }else{$('#activeTrade').textContent='None';$('#activeTrade').className='';$('#tradeTimer').textContent='Waiting for next eligible strong signal'}
   const n=state.wins+state.losses;$('#winRate').textContent=(n?Math.round(state.wins/n*100):0)+'%';$('#record').textContent=state.wins+'W • '+state.losses+'L';renderLearning(a);
-  $('#history').innerHTML=state.history.map(x=>{const isOpen=x.result==='OPEN',resultClass=isOpen?'neutral':x.result==='WIN'?'up':'down',exitText=x.exit==null?'—':priceText(x.exit),pnlText=x.pnl==null?'—':(x.pnl>=0?'+':'')+'₹'+Number(x.pnl).toFixed(0),pnlClass=x.pnl==null?'neutral':x.pnl>=0?'up':'down';return `<tr><td>${new Date(x.signalTime).toLocaleTimeString()}</td><td>${new Date(x.expiryTime).toLocaleTimeString()}</td><td class="${x.side==='UP'?'up':'down'}">${x.side}</td><td>${priceText(x.entry)}</td><td>${exitText}</td><td>₹${Number(x.stake).toFixed(0)}</td><td>${Math.round(x.confidence||0)}</td><td class="${resultClass}">${isOpen?'⏳ OPEN':x.result}</td><td class="${pnlClass}">${pnlText}</td><td class="muted">${x.learningNote||'—'}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">No official-feed virtual signals recorded yet</td></tr>';
+  $('#history').innerHTML=state.history.map(x=>{const isOpen=x.result==='OPEN',resultClass=isOpen?'neutral':x.result==='WIN'?'up':'down',exitText=x.exit==null?'—':priceText(x.exit),pnlText=x.pnl==null?'—':(x.pnl>=0?'+':'')+'₹'+Number(x.pnl).toFixed(0),pnlClass=x.pnl==null?'neutral':x.pnl>=0?'up':'down';return `<tr><td>${new Date(x.signalTime).toLocaleTimeString()}</td><td>${new Date(x.expiryTime).toLocaleTimeString()}</td><td class="${x.side==='UP'?'up':'down'}">${sideText(x.side)}</td><td>${priceText(x.entry)}</td><td>${exitText}</td><td>₹${Number(x.stake).toFixed(0)}</td><td>${Math.round(x.confidence||0)}</td><td class="${resultClass}">${isOpen?'⏳ OPEN':x.result}</td><td class="${pnlClass}">${pnlText}</td><td class="muted">${x.learningNote||'—'}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">No official-feed virtual signals recorded yet</td></tr>';
   drawChart();
 }
 
@@ -216,4 +245,4 @@ $('#resetBtn').onclick=()=>{if(confirm('Reset official-feed virtual balance, his
 $('#clearHistory').onclick=()=>{state.history=[];state.wins=0;state.losses=0;save();render()};
 ['stake','threshold','cooldown','autoMode'].forEach(id=>$('#'+id).addEventListener('change',()=>{save();render()}));
 window.addEventListener('resize',drawChart);
-render();fetchOfficial();setInterval(fetchOfficial,10000);
+render();fetchOfficial();setInterval(fetchOfficial,10000);setInterval(()=>{if(state.active)render()},1000);
