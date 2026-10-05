@@ -1,4 +1,4 @@
-name: Build SHIB OTC APK
+name: SHIB-OTC-Virtual
 
 on:
   workflow_dispatch:
@@ -9,6 +9,7 @@ on:
 
 jobs:
   build:
+    name: SHIB-OTC-Virtual APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,16 +26,16 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Build debug APK
+      - name: Build SHIB-OTC-Virtual APK
         working-directory: shib-otc-apk
         run: gradle --no-daemon assembleDebug
 
       - name: Rename APK
         run: cp shib-otc-apk/app/build/outputs/apk/debug/app-debug.apk SHIB-OTC-Virtual.apk
 
-      - name: Upload APK
+      - name: Upload SHIB-OTC-Virtual
         uses: actions/upload-artifact@v4
         with:
-          name: SHIB-OTC-Virtual-APK
+          name: SHIB-OTC-Virtual
           path: SHIB-OTC-Virtual.apk
           retention-days: 30
