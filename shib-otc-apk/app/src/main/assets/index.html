@@ -124,19 +124,25 @@
       <div class="rule">The engine learns only from completed virtual trades on the Olymptrade-source feed. It waits for 20 similar trades before adapting scores.</div>
     </section>
 
-    <section class="card loss-lab">
-      <div class="row between">
+    <details class="card loss-lab">
+      <summary class="loss-summary">
         <div>
           <h2>Loss Diagnostic Lab</h2>
-          <small class="muted">Screenshot this box for future strategy upgrades</small>
+          <small class="muted">Tap to open all loss details</small>
         </div>
-        <span id="lossCount" class="pill">0 LOSSES</span>
+        <div class="loss-summary-right">
+          <span id="lossCount" class="pill">0 LOSSES</span>
+          <span class="loss-chevron">⌄</span>
+        </div>
+      </summary>
+      <div class="loss-collapsible">
+        <small class="muted">Screenshot this box for future strategy upgrades</small>
+        <div id="lossDiagnostics" class="loss-list">
+          <div class="loss-empty">No diagnosed losses yet.</div>
+        </div>
+        <div class="rule">Loss reasons are diagnostic clues, not proof of a single cause. Upgrade Codes preserve the entry setup so future versions can add better filters.</div>
       </div>
-      <div id="lossDiagnostics" class="loss-list">
-        <div class="loss-empty">No diagnosed losses yet.</div>
-      </div>
-      <div class="rule">Loss reasons are diagnostic clues, not proof of a single cause. Upgrade Codes preserve the entry setup so future versions can add better filters.</div>
-    </section>
+    </details>
 
     <section class="card">
       <div class="row between">
