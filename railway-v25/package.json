@@ -1,0 +1,11 @@
+{
+  "name": "gaurav-scanner-v25",
+  "version": "2.5.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
