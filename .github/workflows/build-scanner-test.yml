@@ -1,9 +1,6 @@
 name: Build Gaurav Scanner Test APK
 on:
   push:
-    paths:
-      - 'scanner-test-app/**'
-      - '.github/workflows/build-scanner-test.yml'
   workflow_dispatch:
 jobs:
   build:
