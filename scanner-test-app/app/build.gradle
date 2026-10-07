@@ -1,0 +1,12 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.gaurav.signalscannertest'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'com.gaurav.signalscannertest'
+        minSdk 23
+        targetSdk 35
+        versionCode 25
+        versionName '2.5'
+    }
+}
