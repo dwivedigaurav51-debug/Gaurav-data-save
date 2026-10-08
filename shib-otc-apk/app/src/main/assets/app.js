@@ -1,6 +1,6 @@
 const $=s=>document.querySelector(s);
 const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
-const FEED_VERSION='olymptrade-public-shibusd-otc-v1';
+const FEED_VERSION='olymptrade-public-shibusd-otc-v1'; // Keep V8 local history compatible
 const API=(window.__HATCHABLE__?.api||'/api')+'/olymp-shib';
 
 function freshState(){
@@ -240,7 +240,7 @@ function isFeedStale(){
 }
 
 function normalizeOlymptradeRaw(raw){
-  if(raw&&raw.ok&&Array.isArray(raw.candles))return raw;
+  if(raw?._bridgeError)throw new Error('Olymptrade SHIB OTC connection: '+raw._bridgeError);if(raw?.asset?.symbol && String(raw.asset.symbol).toUpperCase()!=='SHIBUSD_OTC')throw new Error('Wrong asset returned by feed');if(raw&&raw.ok&&Array.isArray(raw.candles))return raw;
   const charts=Array.isArray(raw?.charts)?raw.charts:[];
   const fresh=charts.filter(c=>Array.isArray(c.candles)&&c.candles.length).sort((a,b)=>Number(b.to||0)-Number(a.to||0))[0];
   if(!fresh)throw new Error('No SHIB OTC chart data');
@@ -268,13 +268,12 @@ async function fetchOfficial(){
       d=normalizeOlymptradeRaw(raw);
     }
     const incoming=(d.candles||[]).map(x=>({ts:Number(x.ts),c:Number(x.c)})).filter(x=>Number.isFinite(x.ts)&&Number.isFinite(x.c)).sort((a,b)=>a.ts-b.ts);
-    if(!incoming.length)throw new Error('No official data points');
+    if(!incoming.length)throw new Error('No SHIB OTC price points');if(incoming.some(p=>p.c<=0||p.ts<1000000000||p.ts>Math.floor(Date.now()/1000)+120))throw new Error('Invalid SHIB OTC price/timestamp');
     const prevLast=state.lastSourceTs;
     state.points=incoming.slice(-400);state.price=state.points.at(-1).c;state.lastSourceTs=state.points.at(-1).ts;
     state.sourceFrame=Number(d.candle_frame||300);state.sourceTitle=d.chart_title||'1D';state.precision=Number(d.precision??4);state.lastFetchAt=Date.now();state.feedError='';
     state.feedOk=!isFeedStale();
-    backfillLegacyLosses();
-    settleFromOfficialPoints();
+    if(state.feedOk){backfillLegacyLosses();settleFromOfficialPoints();}
     if(state.lastSourceTs!==prevLast){
       state.lastProcessedTs=state.lastSourceTs;
       evaluateOnNewPoint();
