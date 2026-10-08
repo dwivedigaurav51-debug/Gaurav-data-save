@@ -218,18 +218,18 @@ function openTrade(a){
 function settleFromOfficialPoints(){
   const t=state.active;if(!t)return;
   const target=Math.floor(t.expiresAt/1000);
-  const exitPoint=state.points.find(p=>p.ts>=target);
+  const exitPoint=state.points.find(p=>p.ts>=target && p.ts<=target+Math.max(300,Number(state.sourceFrame)||300));
   if(!exitPoint)return;
-  const exit=exitPoint.c,win=t.side==='UP'?exit>t.entry:exit<t.entry;let pnl;
-  if(win){state.balance+=t.stake*1.9;pnl=t.stake*.9;state.wins++}else{pnl=-t.stake;state.losses++}
-  learnFromTrade(t,win);
-  const row=state.history.find(x=>x.tradeId===t.tradeId),note=win?'Winning setup reinforced':lossReason(t);
-  const diagnostic=win?null:diagnoseLoss(t,exit);
+  const exit=exitPoint.c,tie=exit===t.entry,win=t.side==='UP'?exit>t.entry:exit<t.entry;let pnl;
+  if(tie){state.balance+=t.stake;pnl=0}else if(win){state.balance+=t.stake*1.9;pnl=t.stake*.9;state.wins++}else{pnl=-t.stake;state.losses++}
+  if(!tie)learnFromTrade(t,win);
+  const row=state.history.find(x=>x.tradeId===t.tradeId),note=tie?'DRAW • stake refunded':win?'Winning setup reinforced':lossReason(t);
+  const diagnostic=(win||tie)?null:diagnoseLoss(t,exit);
   if(row){
-    row.exit=exit;row.result=win?'WIN':'LOSS';row.pnl=pnl;row.settledAt=exitPoint.ts*1000;row.learningNote=note;
+    row.exit=exit;row.result=tie?'DRAW':win?'WIN':'LOSS';row.pnl=pnl;row.settledAt=exitPoint.ts*1000;row.learningNote=note;
     if(diagnostic){row.lossDiagnostic=diagnostic;row.lossCode=diagnostic.code}
   }
-  sendAlert('SHIB OTC • '+(win?'WIN ✅':'LOSS ❌'),sideText(t.side)+' • Exit '+priceText(exit)+' • '+(pnl>=0?'+':'')+'₹'+pnl.toFixed(0));
+  sendAlert('SHIB OTC • '+(tie?'DRAW ↔️':win?'WIN ✅':'LOSS ❌'),sideText(t.side)+' • Exit '+priceText(exit)+' • '+(pnl>=0?'+':'')+'₹'+pnl.toFixed(0));
   state.active=null;save();
 }
 
@@ -268,7 +268,7 @@ async function fetchOfficial(){
       d=normalizeOlymptradeRaw(raw);
     }
     const incoming=(d.candles||[]).map(x=>({ts:Number(x.ts),c:Number(x.c)})).filter(x=>Number.isFinite(x.ts)&&Number.isFinite(x.c)).sort((a,b)=>a.ts-b.ts);
-    if(!incoming.length)throw new Error('No SHIB OTC price points');if(incoming.some(p=>p.c<=0||p.ts<1000000000||p.ts>Math.floor(Date.now()/1000)+120))throw new Error('Invalid SHIB OTC price/timestamp');
+    if(!incoming.length)throw new Error('No SHIB OTC price points');if(incoming.some((p,i)=>i>0&&p.ts===incoming[i-1].ts))throw new Error('Duplicate SHIB OTC timestamps');if(incoming.some(p=>p.c<=0||p.ts<1000000000||p.ts>Math.floor(Date.now()/1000)+120))throw new Error('Invalid SHIB OTC price/timestamp');
     const prevLast=state.lastSourceTs;
     state.points=incoming.slice(-400);state.price=state.points.at(-1).c;state.lastSourceTs=state.points.at(-1).ts;
     state.sourceFrame=Number(d.candle_frame||300);state.sourceTitle=d.chart_title||'1D';state.precision=Number(d.precision??4);state.lastFetchAt=Date.now();state.feedError='';
@@ -370,7 +370,7 @@ function render(){
     $('#tradeTimer').textContent=(left==='00:00'?'00:00 • waiting official close':left+' left')+' • expires '+new Date(state.active.expiresAt).toLocaleTimeString();
   }else{$('#activeTrade').textContent='None';$('#activeTrade').className='';$('#tradeTimer').textContent='Waiting for next eligible strong signal'}
   const n=state.wins+state.losses;$('#winRate').textContent=(n?Math.round(state.wins/n*100):0)+'%';$('#record').textContent=state.wins+'W • '+state.losses+'L';renderLearning(a);
-  $('#history').innerHTML=state.history.map(x=>{const isOpen=x.result==='OPEN',resultClass=isOpen?'neutral':x.result==='WIN'?'up':'down',exitText=x.exit==null?'—':priceText(x.exit),pnlText=x.pnl==null?'—':(x.pnl>=0?'+':'')+'₹'+Number(x.pnl).toFixed(0),pnlClass=x.pnl==null?'neutral':x.pnl>=0?'up':'down';return `<tr><td>${new Date(x.signalTime).toLocaleTimeString()}</td><td>${new Date(x.expiryTime).toLocaleTimeString()}</td><td class="${x.side==='UP'?'up':'down'}">${sideText(x.side)}</td><td>${priceText(x.entry)}</td><td>${exitText}</td><td>₹${Number(x.stake).toFixed(0)}</td><td>${Math.round(x.confidence||0)}</td><td class="${resultClass}">${isOpen?'⏳ OPEN':x.result}</td><td class="${pnlClass}">${pnlText}</td><td class="muted">${x.learningNote||'—'}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">No official-feed virtual signals recorded yet</td></tr>';
+  $('#history').innerHTML=state.history.map(x=>{const isOpen=x.result==='OPEN',resultClass=isOpen||x.result==='DRAW'?'neutral':x.result==='WIN'?'up':'down',exitText=x.exit==null?'—':priceText(x.exit),pnlText=x.pnl==null?'—':(x.pnl>=0?'+':'')+'₹'+Number(x.pnl).toFixed(0),pnlClass=x.pnl==null?'neutral':x.pnl>=0?'up':'down';return `<tr><td>${new Date(x.signalTime).toLocaleTimeString()}</td><td>${new Date(x.expiryTime).toLocaleTimeString()}</td><td class="${x.side==='UP'?'up':'down'}">${sideText(x.side)}</td><td>${priceText(x.entry)}</td><td>${exitText}</td><td>₹${Number(x.stake).toFixed(0)}</td><td>${Math.round(x.confidence||0)}</td><td class="${resultClass}">${isOpen?'⏳ OPEN':x.result}</td><td class="${pnlClass}">${pnlText}</td><td class="muted">${x.learningNote||'—'}</td></tr>`}).join('')||'<tr><td colspan="10" class="muted">No official-feed virtual signals recorded yet</td></tr>';
   renderLossDiagnostics();
   drawChart();
 }
@@ -384,7 +384,7 @@ function drawChart(){
 }
 
 $('#resetBtn').onclick=()=>{if(confirm('Reset official-feed virtual balance, history and adaptive learning?')){state=freshState();save();render();fetchOfficial()}};
-$('#clearHistory').onclick=()=>{state.history=[];state.wins=0;state.losses=0;save();render()};
+$('#clearHistory').onclick=()=>{if(state.active){alert('An active virtual trade is open. Wait until it settles before clearing history.');return}if(!confirm('Clear trade history and learning? Virtual balance will be reset to ₹10,000.'))return;state=freshState();save();render();fetchOfficial()};
 ['stake','threshold','cooldown','autoMode'].forEach(id=>$('#'+id).addEventListener('change',()=>{save();render()}));
 $('#alertsToggle').addEventListener('change',()=>{
   state.alertsEnabled=$('#alertsToggle').checked;
