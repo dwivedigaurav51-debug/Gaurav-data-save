@@ -3,7 +3,7 @@ const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,max
 const FEED_VERSION='olymptrade-public-shibusd-otc-v1'; // Keep V8 local history compatible
 const API=(window.__HATCHABLE__?.api||'/api')+'/olymp-shib';
 const ASSET_KEY='gauravSelectedOtcAsset';
-let selectedAsset=localStorage.getItem(ASSET_KEY)==='PEPE_OTC'?'PEPE_OTC':'SHIBUSD_OTC';
+let selectedAsset=localStorage.getItem(ASSET_KEY)==='PEPEUSD_OTC'?'PEPE_OTC':'SHIBUSD_OTC';
 const stateKey=()=>selectedAsset==='PEPE_OTC'?'pepePaperState':'shibPaperState';
 
 function freshState(){
@@ -243,7 +243,7 @@ function isFeedStale(){
 }
 
 function normalizeOlymptradeRaw(raw){
-  if(raw?._bridgeError)throw new Error('Olymptrade SHIB OTC connection: '+raw._bridgeError);if(raw?.asset?.symbol && String(raw.asset.symbol).toUpperCase()!=='SHIBUSD_OTC')throw new Error('Wrong asset returned by feed');if(raw&&raw.ok&&Array.isArray(raw.candles))return raw;
+  if(raw?._bridgeError)throw new Error('Olymptrade SHIB OTC connection: '+raw._bridgeError);if(raw?.asset?.symbol && String(raw.asset.symbol).toUpperCase()!==selectedAsset)throw new Error('Wrong asset returned by feed');if(raw&&raw.ok&&Array.isArray(raw.candles))return raw;
   const charts=Array.isArray(raw?.charts)?raw.charts:[];
   const fresh=charts.filter(c=>Array.isArray(c.candles)&&c.candles.length).sort((a,b)=>Number(b.to||0)-Number(a.to||0))[0];
   if(!fresh)throw new Error('No SHIB OTC chart data');
@@ -263,11 +263,11 @@ async function fetchOfficial(){
     const requestedAsset=selectedAsset;
     let d;
     if(window.AndroidBridge&&typeof window.AndroidBridge.fetchShib==='function'){
-      const rawText=window.AndroidBridge.fetchShib();
+      const rawText=typeof window.AndroidBridge.fetchOtc==='function'?window.AndroidBridge.fetchOtc(requestedAsset):selectedAsset==='SHIBUSD_OTC'?window.AndroidBridge.fetchShib():'{"_bridgeError":"PEPE OTC bridge unavailable"}';
       const raw=JSON.parse(rawText);
       d=normalizeOlymptradeRaw(raw);
     }else{
-      const res=await fetch(API+'?t='+Date.now(),{cache:'no-store'});
+      const res=await fetch(API+'?asset='+encodeURIComponent(requestedAsset)+'&t='+Date.now(),{cache:'no-store'});
       const raw=await res.json();
       if(!res.ok||!raw.ok)throw new Error(raw.error||'Feed unavailable');
       d=normalizeOlymptradeRaw(raw);
@@ -285,7 +285,6 @@ async function fetchOfficial(){
       evaluateOnNewPoint();
     }
   }catch(e){
-    if(selectedAsset!=='SHIBUSD_OTC')return;
     state.feedOk=false;state.feedError=String(e?.message||e);
   }finally{
     fetching=false;render();save();
@@ -347,9 +346,9 @@ function render(){
   $('#assetSelect').value=selectedAsset;
   const isPepe=selectedAsset==='PEPE_OTC';
   $('#assetName').textContent=isPepe?'PEPE / OTC':'SHIB / OTC';
-  $('#chartTitle').textContent=isPepe?'Olymptrade PEPE OTC • Feed pending':'Olymptrade SHIB OTC feed';
-  $('#chartSub').textContent=isPepe?'PEPE OTC • live prices not verified':'SHIBUSD_OTC • 5-minute close points';
-  $('#assetNotice').textContent=isPepe?'PEPE OTC: source unavailable — signals and virtual trades disabled':'SHIB OTC: source freshness and prices are checked';
+  $('#chartTitle').textContent=isPepe?'Olymptrade PEPE OTC • Feed validation':'Olymptrade SHIB OTC feed';
+  $('#chartSub').textContent=isPepe?'PEPEUSD_OTC • awaiting verified price points':'SHIBUSD_OTC • 5-minute close points';
+  $('#assetNotice').textContent=isPepe?'PEPE OTC: checking Olymptrade PEPEUSD_OTC source; trades blocked until verified':'SHIB OTC: source freshness and prices are checked';
   $('#price').textContent=priceText(p);
   const ch=lastRenderedPrice&&p!=null?(p-lastRenderedPrice)/lastRenderedPrice*100:0;if(p!=null)lastRenderedPrice=p;
   $('#priceChange').textContent=(ch>=0?'+':'')+ch.toFixed(3)+'%';
@@ -372,8 +371,8 @@ function render(){
     action.className='muted';
   }
   const dot=$('#feedDot'),fs=$('#feedStatus');
-  if(!isPepe&&state.feedOk&&!stale){dot.style.background='#33d17a';fs.textContent=`OLYMPTRADE SHIB OTC • official public feed • ${Math.round(state.sourceFrame/60)}m • ${new Date(state.lastSourceTs*1000).toLocaleTimeString()}`}
-  else{dot.style.background='#ff667e';fs.textContent=isPepe?'PEPE OTC FEED • NOT CONNECTED':'OLYMPTRADE FEED • '+(state.feedError||'STALE / waiting')}
+  if(state.feedOk&&!stale){dot.style.background='#33d17a';fs.textContent=`OLYMPTRADE SHIB OTC • official public feed • ${Math.round(state.sourceFrame/60)}m • ${new Date(state.lastSourceTs*1000).toLocaleTimeString()}`}
+  else{dot.style.background='#ff667e';fs.textContent=(isPepe?'PEPE OTC':'SHIB OTC')+' FEED • '+(state.feedError||'STALE / waiting')}
   $('#alertsToggle').checked=state.alertsEnabled;
   $('#balance').textContent=fmt(state.balance);const pnl=state.balance-state.startBalance+(state.active?state.active.stake:0);$('#pnl').textContent='P/L '+fmt(pnl);
   if(state.active){
@@ -396,7 +395,7 @@ function drawChart(){
   x.strokeStyle='#8fb8ff';x.lineWidth=2;x.beginPath();arr.forEach((v,i)=>{const xx=i/(arr.length-1)*w,yy=h-(v.c-min)/(max-min)*h;if(i===0)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke();
 }
 
-$('#assetSelect').addEventListener('change',()=>{save();selectedAsset=$('#assetSelect').value;localStorage.setItem(ASSET_KEY,selectedAsset);let stored=null;try{stored=JSON.parse(localStorage.getItem(stateKey())||'null')}catch{}state=stored&&stored.feedVersion===FEED_VERSION?stored:freshState();state.history=state.history||[];state.points=state.points||[];state.learning=state.learning||freshState().learning;state.learning.patterns=state.learning.patterns||{};state.learning.tags=state.learning.tags||{};state.learning.recent=state.learning.recent||[];state.alertsEnabled=state.alertsEnabled!==false;state.feedOk=false;state.feedError='';lastRenderedPrice=0;render();if(selectedAsset==='SHIBUSD_OTC')fetchOfficial()});
+$('#assetSelect').addEventListener('change',()=>{save();selectedAsset=$('#assetSelect').value;localStorage.setItem(ASSET_KEY,selectedAsset);let stored=null;try{stored=JSON.parse(localStorage.getItem(stateKey())||'null')}catch{}state=stored&&stored.feedVersion===FEED_VERSION?stored:freshState();state.history=state.history||[];state.points=state.points||[];state.learning=state.learning||freshState().learning;state.learning.patterns=state.learning.patterns||{};state.learning.tags=state.learning.tags||{};state.learning.recent=state.learning.recent||[];state.alertsEnabled=state.alertsEnabled!==false;state.feedOk=false;state.feedError='';lastRenderedPrice=0;render();fetchOfficial()});
 $('#resetBtn').onclick=()=>{if(confirm('Reset official-feed virtual balance, history and adaptive learning?')){state=freshState();save();render();fetchOfficial()}};
 $('#clearHistory').onclick=()=>{if(state.active){alert('An active virtual trade is open. Wait until it settles before clearing history.');return}if(!confirm('Clear trade history and learning? Virtual balance will be reset to ₹10,000.'))return;state=freshState();save();render();fetchOfficial()};
 ['stake','threshold','cooldown','autoMode'].forEach(id=>$('#'+id).addEventListener('change',()=>{save();render()}));
