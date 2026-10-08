@@ -30,10 +30,14 @@ public class MainActivity extends Activity {
 
     public class AndroidBridge {
         @JavascriptInterface
-        public String fetchShib() {
+        public String fetchShib() { return fetchOtc("SHIBUSD_OTC"); }
+
+        @JavascriptInterface
+        public String fetchOtc(String asset) {
+            if (!"SHIBUSD_OTC".equals(asset) && !"PEPEUSD_OTC".equals(asset)) return "{\"_bridgeError\":\"Unsupported asset\"}";
             HttpsURLConnection conn = null;
             try {
-                URL url = new URL("https://gw-plus.olymptrade.com/api/assets/v1/SHIBUSD_OTC?x=" + System.currentTimeMillis());
+                URL url = new URL("https://gw-plus.olymptrade.com/api/assets/v1/" + asset + "?x=" + System.currentTimeMillis());
                 conn = (HttpsURLConnection) url.openConnection();
                 conn.setRequestMethod("GET");
                 conn.setConnectTimeout(10000);
