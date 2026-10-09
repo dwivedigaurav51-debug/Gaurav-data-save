@@ -42,6 +42,6 @@ jobs:
       - name: Upload SHIB-OTC-Virtual
         uses: actions/upload-artifact@v4
         with:
-          name: SHIB-OTC-Virtual
-          path: SHIB-OTC-Virtual.apk
+          name: Envarg-OTC-Ultimate-V10
+          path: Envarg-OTC-Ultimate-V10.apk
           retention-days: 30
