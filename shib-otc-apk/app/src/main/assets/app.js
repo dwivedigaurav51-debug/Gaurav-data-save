@@ -356,6 +356,22 @@ function render(){
   const stale=isFeedStale(),threshold=+$('#threshold').value||78,activeSignal=(!stale&&state.feedOk&&!a.exhaustionBlocked&&a.confidence>=threshold&&a.score>=55)?a.side:'NONE';
   const s=$('#signal');s.textContent=stale?'NO TRADE • FEED STALE':activeSignal==='NONE'?'NO TRADE':(a.confidence>=88&&state.learning.total>=20?'SUPER STRONG ':'STRONG ')+activeSignal;s.className=activeSignal==='UP'?'up':activeSignal==='DOWN'?'down':'neutral';
   $('#confidence').textContent=`Adaptive ${a.confidence}/100 • Base ${a.baseConfidence}/100`;$('#scoreFill').style.width=a.confidence+'%';$('#reason').textContent=a.reason;
+  const ultimateReasons=[];
+  const uf=a.features;
+  let ultimateSide='NONE';
+  if(!state.feedOk||stale)ultimateReasons.push('Verified fresh feed required');
+  if(state.points.length<55)ultimateReasons.push('Need at least 55 price points');
+  if(!uf)ultimateReasons.push('Indicators not ready');
+  if(uf&&state.feedOk&&!stale&&state.points.length>=55){
+    const up=a.side==='UP'&&uf.emaTrend==='bull'&&uf.macd==='pos'&&uf.R>=52&&uf.R<65&&uf.st>=55&&uf.st<80&&uf.bbPos==='upper'&&uf.volPct>.02&&uf.volPct<.7&&uf.slope>.08&&a.scoreGap>=25&&a.confidence>=90&&!a.exhaustionBlocked;
+    const down=a.side==='DOWN'&&uf.emaTrend==='bear'&&uf.macd==='neg'&&uf.R>35&&uf.R<=48&&uf.st>20&&uf.st<=45&&uf.bbPos==='lower'&&uf.volPct>.02&&uf.volPct<.7&&uf.slope<-.08&&a.scoreGap>=25&&a.confidence>=90&&!a.exhaustionBlocked;
+    if(up)ultimateSide='UP';
+    else if(down)ultimateSide='DOWN';
+    else ultimateReasons.push('EMA, RSI, MACD, Stochastic, Bollinger, volatility, score and directional gap not fully aligned');
+  }
+  $('#ultimateSignal').textContent=ultimateSide==='NONE'?'NO ULTIMATE SIGNAL':'ULTIMATE STRONG '+ultimateSide;
+  $('#ultimateSignal').className=ultimateSide==='UP'?'up':ultimateSide==='DOWN'?'down':'neutral';
+  $('#ultimateReason').textContent=ultimateSide==='NONE'?ultimateReasons.join(' • '):'All strict filters agree on the latest available candle. Experimental indicator agreement; no accuracy guarantee.';
   const health=[];
   if(!state.feedOk)health.push('FEED ERROR: '+(state.feedError||'Data not verified'));
   if(stale)health.push('STALE: last candle is more than 12 minutes old or missing');
