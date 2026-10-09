@@ -217,7 +217,12 @@ function openUltimate(a,side){
   const p=state.points.at(-1),frame=Number(state.sourceFrame)||300;
   if(!p||ultimate.active||ultimate.balance<200||ultimate.lastTradeTs>=p.ts)return;
   const expiresAt=(p.ts+frame)*1000;
-  if(expiresAt<=Date.now())return;
+  // A source candle may already be closed when received. Never silently reject a
+  // qualified signal: show it, but do not simulate a retroactive entry.
+  if(expiresAt<=Date.now()){
+    ultimate.lastBlockedReason='Qualified setup on already-expired source candle; no retroactive virtual trade';
+    ultimate.lastBlockedTs=p.ts;saveUltimate();return;
+  }
   ultimate.balance-=200;
   const row={id:'ULT-'+selectedAsset+'-'+p.ts,side,entry:p.c,exit:null,stake:200,sourceTs:p.ts,signalTime:p.ts*1000,expiresAt,confidence:a.confidence,features:a.features,result:'OPEN',pnl:null};
   ultimate.active=row;ultimate.history.unshift(row);ultimate.history=ultimate.history.slice(0,150);ultimate.lastTradeTs=p.ts;saveUltimate();
@@ -242,7 +247,7 @@ function renderUltimate(){
   $('#ultimatePnl').textContent=fmt(ultimate.balance-10000+(ultimate.active?200:0));
   $('#ultimateRecord').textContent=ultimate.wins+'W • '+ultimate.losses+'L';
   $('#ultimateAuto').checked=ultimate.enabled;
-  $('#ultimateActive').textContent=ultimate.active?'ACTIVE '+ultimate.active.side+' • ₹200 • expiry '+new Date(ultimate.active.expiresAt).toLocaleTimeString():'No ultimate virtual trade open';
+  $('#ultimateActive').textContent=ultimate.active?'ACTIVE '+ultimate.active.side+' • ₹200 • expiry '+new Date(ultimate.active.expiresAt).toLocaleTimeString():(ultimate.lastBlockedReason||'No ultimate virtual trade open');
   $('#ultimateHistory').innerHTML=ultimate.history.length?ultimate.history.map(t=>{
     const d=t.diagnostic;
     return '<div class="loss-item" style="padding:10px;border-bottom:1px solid #30415b"><strong>'+t.side+' • '+t.result+' • '+(t.pnl==null?'pending':fmt(t.pnl))+'</strong><div>'+new Date(t.signalTime).toLocaleString()+' • Entry '+Number(t.entry).toFixed(4)+' • Exit '+(t.exit==null?'—':Number(t.exit).toFixed(4))+'</div>'+(d?'<div>Loss Diagnostic: '+d.reason+'</div><small>'+d.code+'</small>':'')+'</div>'
