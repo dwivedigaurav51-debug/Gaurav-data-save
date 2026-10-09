@@ -200,9 +200,60 @@ function backfillLegacyLosses(){
   return changed;
 }
 
+
+function ultimateKey(){return 'ultimatePaper_'+selectedAsset}
+function newUltimate(){return {balance:10000,wins:0,losses:0,history:[],active:null,lastTradeTs:0,enabled:true}}
+function loadUltimate(){let v=null;try{v=JSON.parse(localStorage.getItem(ultimateKey())||'null')}catch{}return v&&Number.isFinite(v.balance)?v:newUltimate()}
+let ultimate=loadUltimate();
+function saveUltimate(){localStorage.setItem(ultimateKey(),JSON.stringify(ultimate))}
+function ultimateDirection(a){
+  const f=a.features;
+  if(!f||!state.feedOk||isFeedStale()||state.points.length<55||a.exhaustionBlocked||a.scoreGap<25||a.confidence<90)return 'NONE';
+  if(a.side==='UP'&&f.emaTrend==='bull'&&f.macd==='pos'&&f.R>=52&&f.R<65&&f.st>=55&&f.st<80&&f.bbPos==='upper'&&f.volPct>.02&&f.volPct<.7&&f.slope>.08)return 'UP';
+  if(a.side==='DOWN'&&f.emaTrend==='bear'&&f.macd==='neg'&&f.R>35&&f.R<=48&&f.st>20&&f.st<=45&&f.bbPos==='lower'&&f.volPct>.02&&f.volPct<.7&&f.slope<-.08)return 'DOWN';
+  return 'NONE';
+}
+function openUltimate(a,side){
+  const p=state.points.at(-1),frame=Number(state.sourceFrame)||300;
+  if(!p||ultimate.active||ultimate.balance<200||ultimate.lastTradeTs>=p.ts)return;
+  const expiresAt=(p.ts+frame)*1000;
+  if(expiresAt<=Date.now())return;
+  ultimate.balance-=200;
+  const row={id:'ULT-'+selectedAsset+'-'+p.ts,side,entry:p.c,exit:null,stake:200,sourceTs:p.ts,signalTime:p.ts*1000,expiresAt,confidence:a.confidence,features:a.features,result:'OPEN',pnl:null};
+  ultimate.active=row;ultimate.history.unshift(row);ultimate.history=ultimate.history.slice(0,150);ultimate.lastTradeTs=p.ts;saveUltimate();
+  sendAlert(selectedAsset+' • ULTIMATE virtual entry',side+' • ₹200 • '+priceText(p.c));
+}
+function settleUltimate(){
+  const t=ultimate.active;if(!t)return;
+  const frame=Number(state.sourceFrame)||300,target=Math.floor(t.expiresAt/1000);
+  const p=state.points.find(x=>x.ts>=target&&x.ts<=target+frame);
+  if(!p)return;
+  const win=t.side==='UP'?p.c>t.entry:p.c<t.entry,draw=p.c===t.entry;
+  t.exit=p.c;t.settledAt=p.ts*1000;t.result=draw?'DRAW':win?'WIN':'LOSS';
+  t.pnl=draw?0:win?180:-200;
+  if(draw)ultimate.balance+=200;
+  else if(win){ultimate.balance+=380;ultimate.wins++}
+  else{ultimate.losses++;t.diagnostic=diagnoseLoss({...t,scoreGap:0},p.c)}
+  ultimate.active=null;saveUltimate();
+  sendAlert(selectedAsset+' • ULTIMATE '+t.result,'₹'+t.pnl+' • '+t.side+' • exit '+priceText(p.c));
+}
+function renderUltimate(){
+  $('#ultimateBalance').textContent=fmt(ultimate.balance);
+  $('#ultimatePnl').textContent=fmt(ultimate.balance-10000+(ultimate.active?200:0));
+  $('#ultimateRecord').textContent=ultimate.wins+'W • '+ultimate.losses+'L';
+  $('#ultimateAuto').checked=ultimate.enabled;
+  $('#ultimateActive').textContent=ultimate.active?'ACTIVE '+ultimate.active.side+' • ₹200 • expiry '+new Date(ultimate.active.expiresAt).toLocaleTimeString():'No ultimate virtual trade open';
+  $('#ultimateHistory').innerHTML=ultimate.history.length?ultimate.history.map(t=>{
+    const d=t.diagnostic;
+    return '<div class="loss-item" style="padding:10px;border-bottom:1px solid #30415b"><strong>'+t.side+' • '+t.result+' • '+(t.pnl==null?'pending':fmt(t.pnl))+'</strong><div>'+new Date(t.signalTime).toLocaleString()+' • Entry '+Number(t.entry).toFixed(4)+' • Exit '+(t.exit==null?'—':Number(t.exit).toFixed(4))+'</div>'+(d?'<div>Loss Diagnostic: '+d.reason+'</div><small>'+d.code+'</small>':'')+'</div>'
+  }).join(''):'No trades yet';
+}
+
 function evaluateOnNewPoint(){
   if(!state.feedOk||isFeedStale())return;
   const a=analysis(),threshold=Math.max(60,Math.min(95,+$('#threshold').value||78));
+  const ultimateSide=ultimateDirection(a);
+  if(ultimateSide!=='NONE'&&ultimate.enabled)openUltimate(a,ultimateSide);
   const p=state.points.at(-1),strong=a.side!=='NONE'&&!a.exhaustionBlocked&&a.confidence>=threshold&&a.score>=55;
   if(strong&&$('#autoMode').checked&&!state.active&&p){
     const cooldown=Math.max(1,+$('#cooldown').value||1);
@@ -280,7 +331,7 @@ async function fetchOfficial(){
     state.points=incoming.slice(-400);state.price=state.points.at(-1).c;state.lastSourceTs=state.points.at(-1).ts;
     state.sourceFrame=Number(d.candle_frame||300);state.sourceTitle=d.chart_title||'1D';state.precision=Number(d.precision??4);state.lastFetchAt=Date.now();state.feedError='';
     state.feedOk=!isFeedStale();
-    if(state.feedOk){backfillLegacyLosses();settleFromOfficialPoints();}
+    if(state.feedOk){backfillLegacyLosses();settleFromOfficialPoints();settleUltimate();}
     if(state.lastSourceTs!==prevLast){
       state.lastProcessedTs=state.lastSourceTs;
       evaluateOnNewPoint();
@@ -344,6 +395,7 @@ function renderLossDiagnostics(){
 
 function render(){
   const a=analysis(),p=state.price;
+  renderUltimate();
   $('#assetSelect').value=selectedAsset;
   const isPepe=selectedAsset==='PEPEUSD_OTC';
   $('#assetName').textContent=isPepe?'PEPE / OTC':'SHIB / OTC';
@@ -440,7 +492,9 @@ function drawChart(){
   x.strokeStyle='#8fb8ff';x.lineWidth=2;x.beginPath();arr.forEach((v,i)=>{const xx=i/(arr.length-1)*w,yy=h-(v.c-min)/(max-min)*h;if(i===0)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke();
 }
 
-$('#assetSelect').addEventListener('change',()=>{save();selectedAsset=$('#assetSelect').value;localStorage.setItem(ASSET_KEY,selectedAsset);let stored=null;try{stored=JSON.parse(localStorage.getItem(stateKey())||'null')}catch{}state=stored&&stored.feedVersion===FEED_VERSION?stored:freshState();state.history=state.history||[];state.points=state.points||[];state.learning=state.learning||freshState().learning;state.learning.patterns=state.learning.patterns||{};state.learning.tags=state.learning.tags||{};state.learning.recent=state.learning.recent||[];state.alertsEnabled=state.alertsEnabled!==false;state.feedOk=false;state.feedError='Checking asset feed';state.price=null;state.points=[];state.lastSourceTs=0;lastRenderedPrice=0;render();fetchOfficial()});
+$('#assetSelect').addEventListener('change',()=>{save();selectedAsset=$('#assetSelect').value;localStorage.setItem(ASSET_KEY,selectedAsset);let stored=null;try{stored=JSON.parse(localStorage.getItem(stateKey())||'null')}catch{}state=stored&&stored.feedVersion===FEED_VERSION?stored:freshState();state.history=state.history||[];state.points=state.points||[];state.learning=state.learning||freshState().learning;state.learning.patterns=state.learning.patterns||{};state.learning.tags=state.learning.tags||{};state.learning.recent=state.learning.recent||[];state.alertsEnabled=state.alertsEnabled!==false;ultimate=loadUltimate();state.feedOk=false;state.feedError='Checking asset feed';state.price=null;state.points=[];state.lastSourceTs=0;lastRenderedPrice=0;render();fetchOfficial()});
+$('#ultimateAuto').onchange=()=>{ultimate.enabled=$('#ultimateAuto').checked;saveUltimate();renderUltimate()};
+$('#ultimateReset').onclick=()=>{if(ultimate.active){alert('Wait for the active Ultimate virtual trade to settle');return}if(confirm('Reset only Ultimate virtual wallet and loss history to ₹10,000?')){ultimate=newUltimate();saveUltimate();render()}};
 $('#resetBtn').onclick=()=>{if(confirm('Reset official-feed virtual balance, history and adaptive learning?')){state=freshState();save();render();fetchOfficial()}};
 $('#clearHistory').onclick=()=>{if(state.active){alert('An active virtual trade is open. Wait until it settles before clearing history.');return}if(!confirm('Clear trade history and learning? Virtual balance will be reset to ₹10,000.'))return;state=freshState();save();render();fetchOfficial()};
 ['stake','threshold','cooldown','autoMode'].forEach(id=>$('#'+id).addEventListener('change',()=>{save();render()}));
@@ -455,4 +509,4 @@ window.addEventListener('resize',drawChart);
 if(state.alertsEnabled&&window.AndroidBridge&&typeof window.AndroidBridge.requestAlertsPermission==='function'){
   try{window.AndroidBridge.requestAlertsPermission()}catch(e){}
 }
-render();fetchOfficial();setInterval(fetchOfficial,10000);setInterval(()=>{if(state.active)render()},1000);
+render();fetchOfficial();setInterval(fetchOfficial,10000);setInterval(()=>{if(state.active||ultimate.active)render()},1000);
