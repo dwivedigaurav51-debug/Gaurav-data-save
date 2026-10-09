@@ -356,6 +356,34 @@ function render(){
   const stale=isFeedStale(),threshold=+$('#threshold').value||78,activeSignal=(!stale&&state.feedOk&&!a.exhaustionBlocked&&a.confidence>=threshold&&a.score>=55)?a.side:'NONE';
   const s=$('#signal');s.textContent=stale?'NO TRADE • FEED STALE':activeSignal==='NONE'?'NO TRADE':(a.confidence>=88&&state.learning.total>=20?'SUPER STRONG ':'STRONG ')+activeSignal;s.className=activeSignal==='UP'?'up':activeSignal==='DOWN'?'down':'neutral';
   $('#confidence').textContent=`Adaptive ${a.confidence}/100 • Base ${a.baseConfidence}/100`;$('#scoreFill').style.width=a.confidence+'%';$('#reason').textContent=a.reason;
+  const health=[];
+  if(!state.feedOk)health.push('FEED ERROR: '+(state.feedError||'Data not verified'));
+  if(stale)health.push('STALE: last candle is more than 12 minutes old or missing');
+  if(state.points.length<55)health.push('WARMUP: '+state.points.length+'/55 candles available');
+  if(a.side==='NONE')health.push('DIRECTION: no clear UP/DOWN');
+  if(a.side!=='NONE'&&a.exhaustionBlocked){
+    const f=a.features||{};
+    if(a.side==='UP'){
+      if(f.st>=80)health.push('UP BLOCK: Stochastic '+f.st.toFixed(1)+' >= 80');
+      if(f.R>=65)health.push('UP BLOCK: RSI '+f.R.toFixed(1)+' >= 65');
+      if(f.macd==='neg')health.push('UP BLOCK: MACD opposite');
+      if(f.volPct>=.7)health.push('UP BLOCK: volatility >= 0.7%');
+      if(f.bbPos==='above')health.push('UP BLOCK: price above Bollinger upper band');
+    }else{
+      if(f.st<=20)health.push('DOWN BLOCK: Stochastic '+f.st.toFixed(1)+' <= 20');
+      if(f.R<=35)health.push('DOWN BLOCK: RSI '+f.R.toFixed(1)+' <= 35');
+      if(f.macd==='pos')health.push('DOWN BLOCK: MACD opposite');
+      if(f.volPct>=.7)health.push('DOWN BLOCK: volatility >= 0.7%');
+      if(f.bbPos==='below')health.push('DOWN BLOCK: price below Bollinger lower band');
+    }
+  }
+  if(a.confidence<threshold)health.push('SCORE BLOCK: '+a.confidence+' below minimum '+threshold);
+  if(a.score<55)health.push('STRENGTH BLOCK: '+a.score+' below 55');
+  if(!$('#autoMode').checked)health.push('AUTO MODE: disabled');
+  if(state.active)health.push('ACTIVE: virtual trade already open');
+  if(state.lastTradeTs&&state.lastSourceTs<state.lastTradeTs+(Math.max(1,+$('#cooldown').value||1))*(state.sourceFrame||300))health.push('COOLDOWN: waiting for eligible candle');
+  if(!health.length)health.push('READY: filters pass; waiting for next new candle');
+  $('#signalHealth').textContent='Asset: '+selectedAsset+' | Candle: '+(state.lastSourceTs?new Date(state.lastSourceTs*1000).toLocaleString():'none')+' | Data points: '+state.points.length+' | Side: '+a.side+' | Score: '+a.confidence+'\n'+health.join('\n');
   const action=$('#signalAction');
   if(state.active){
     action.textContent=`✅ VIRTUAL TRADE TAKEN • ${sideText(state.active.side)} • ₹${state.active.stake} • Entry ${priceText(state.active.entry)}`;
