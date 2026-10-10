@@ -2,14 +2,14 @@
 // An independent, auditable VIRTUAL ledger. Source candles are *not* executable quotes.
 // Outcomes use the first validated five-minute source point at/after paper expiry.
 window.PaperVirtual=(()=>{
- const KEY='envargOtcMultiPaperV2';
+ const KEY='envargOtcMultiPaperV3_100only'; // V2 ledger remains stored separately; never overwrite it
  const INITIAL=10000,STAKE=200,PAYOUT=.90,DURATION=300000,ENTRY_WINDOW=60000,MAX_QUOTE_AGE=120000,SETTLEMENT_GRACE=300000;
  const SIGNAL_MAX_AGE=420000,ARM_TIMEOUT=900000,REQUIRED_SCORE=100;
  const $=s=>document.querySelector(s);
  const getSaved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}};
- const fallback=()=>({version:2,initial:INITIAL,balance:INITIAL,auto:true,trades:[],skipped:[],armed:[]});
+ const fallback=()=>({version:3,initial:INITIAL,balance:INITIAL,auto:true,trades:[],skipped:[],armed:[]});
  let wallet=getSaved();
- if(!wallet||wallet.version!==2||!Array.isArray(wallet.trades)||!Number.isFinite(wallet.balance))wallet=fallback();
+ if(!wallet||wallet.version!==3||!Array.isArray(wallet.trades)||!Number.isFinite(wallet.balance))wallet=fallback();
  wallet.skipped=Array.isArray(wallet.skipped)?wallet.skipped:[];
  wallet.armed=Array.isArray(wallet.armed)?wallet.armed:[];
  wallet.auto=wallet.auto!==false;
@@ -197,7 +197,16 @@ window.PaperVirtual=(()=>{
    ?open.map(t=>tradeCard(t,true)).join('')
    :'<p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p>';
  }
+ function expireQueued(now=Date.now()){
+  const remaining=[];
+  for(const queued of wallet.armed){
+   if(now>queued.timeoutAt)skip({symbol:queued.symbol,name:queued.name},'100/100 WAITING ENTRY TIMED OUT',now);
+   else remaining.push(queued);
+  }
+  if(remaining.length!==wallet.armed.length){wallet.armed=remaining;save()}
+ }
  function render(){
+  expireQueued();
   const t=totals();
   $('#paperBalance').textContent=fmt(wallet.balance);
   $('#paperWins').textContent=t.wins;
@@ -240,5 +249,5 @@ window.PaperVirtual=(()=>{
    if(!confirm('Reset ONLY Multi Scanner virtual balance, trade history and accuracy to ₹10,000?'))return;
    wallet=fallback();save();render();
  });
- return {onStrong,onQuote,onFeed,getTrade,totals,render,renderOpen,getWallet:()=>wallet};
+ return {onStrong,onQuote,onFeed,getTrade,totals,render,renderOpen,expireQueued,getWallet:()=>wallet};
 })();
