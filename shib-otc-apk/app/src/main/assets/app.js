@@ -471,7 +471,7 @@ function render(){
   renderUltimate();
   $('#assetSelect').value=selectedAsset;
   const isPepe=selectedAsset==='PEPEUSD_OTC';
-  $('#appTitle').textContent=(isPepe?'PEPE':'SHIB')+' OTC Virtual Signal';
+  $('#appTitle').textContent=(isPepe?'PEPE':'SHIB')+' OTC Ultimate V11';
   $('#assetName').textContent=isPepe?'PEPE / OTC':'SHIB / OTC';
   $('#chartTitle').textContent=isPepe?'Olymptrade PEPE OTC • Feed validation':'Olymptrade SHIB OTC feed';
   $('#chartSub').textContent=isPepe?'PEPEUSD_OTC • awaiting verified price points':'SHIBUSD_OTC • 5-minute close points';
