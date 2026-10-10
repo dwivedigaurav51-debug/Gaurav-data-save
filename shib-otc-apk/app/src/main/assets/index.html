@@ -12,7 +12,7 @@
     <header class="topbar">
       <div>
         <div class="eyebrow">PAPER TRADING ONLY</div>
-        <h1>SHIB OTC Virtual Signal</h1>
+        <h1 id="appTitle">SHIB OTC Virtual Signal</h1>
         <div class="feedline"><span id="feedDot" class="dot"></span><span id="feedStatus">OLYMPTRADE SHIB OTC • Connecting…</span></div>
       </div>
       <button id="resetBtn" class="ghost">Reset</button>
@@ -59,7 +59,7 @@
           <small class="muted" id="chartSub">SHIBUSD_OTC • 5-minute closing-price points, pending live verification</small>
         </div>
         <select id="timeframe" disabled>
-          <option value="300" selected>5m official</option>
+          <option value="300" selected>5m source</option>
         </select>
       </div>
       <canvas id="chart"></canvas>
@@ -96,6 +96,9 @@
     <details class="card" open>
       <summary><strong>Signal Health / No-Trade Diagnosis</strong></summary>
       <div id="signalHealth" class="reason" style="margin-top:12px;white-space:pre-line">Checking feed and signal conditions…</div>
+      <div class="rule" style="margin-top:12px"><strong>Today’s Signal Audit</strong></div>
+      <div id="dailyAudit" class="reason" style="margin-top:8px;white-space:pre-line">Waiting for new source candles…</div>
+      <small class="muted">Counters start with this app version and only track candles while the app is open. They do not represent a full-day market backtest.</small>
       <small class="muted">Shows which safety condition blocked the latest virtual trade. No filters are bypassed.</small>
     </details>
 
