@@ -271,9 +271,10 @@ function updateUI(){
  $('#assetList').innerHTML=assets.length?assets.map(a=>{
   const s=STATES[a.symbol],hit=s.strong&&s.status==='LIVE'&&now-s.lastTs*1000<=ALERT_FRESHNESS;
   const status=cardStatus(s),note=s.error||s.reason;
+  const scoreDetail=s.status==='LIVE'?' · Score '+s.score+'/100 (only 100 accepted)':'';
   const quality=s.status==='LIVE'?'ok':['ERROR','STALE'].includes(s.status)?'bad':'';
   return '<article class="assetrow '+(hit?'hit ':'')+(['ERROR','STALE'].includes(s.status)?'err':'')+'">'+
-   '<div><span class="assetname">'+esc(a.name)+'</span><span class="meta">'+esc(note||'Awaiting source')+
+   '<div><span class="assetname">'+esc(a.name)+'</span><span class="meta">'+esc((note||'Awaiting source')+scoreDetail)+
    (s.lastTs?' · '+esc(prettyTime(s.lastTs*1000)):'')+'</span></div>'+
    '<div class="right"><strong class="price">'+esc(fmtPrice(s.price))+'</strong>'+
    '<span class="status '+(hit?'hot':quality)+'">'+esc(hit?'STRONG '+s.side+' · '+s.score:status)+'</span></div></article>'
