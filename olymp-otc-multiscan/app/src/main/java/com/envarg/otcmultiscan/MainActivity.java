@@ -111,7 +111,7 @@ public final class MainActivity extends Activity {
 
         @JavascriptInterface
         public void notifySignal(String symbol, String side, String score, String entryWindow, String expiryTime) {
-            if (!SUPPORTED.contains(symbol) || (!"UP".equals(side) && !"DOWN".equals(side))) return;
+            if (!SUPPORTED.contains(symbol) || (!"UP".equals(side) && !"DOWN".equals(side)) || !"100".equals(score)) return;
             runOnUiThread(() -> publishSignal(symbol, side, score, entryWindow, expiryTime));
         }
 
@@ -200,8 +200,8 @@ public final class MainActivity extends Activity {
     }
 
     private void publishSignal(String symbol, String side, String score, String entryWindow, String expiryTime) {
-        String title = labelForSymbol(symbol) + " • STRONG " + side;
-        String body = "Score " + score + "/100 (not accuracy). Entry " + entryWindow +
+        String title = labelForSymbol(symbol) + " • 100/100 " + side + " PAPER ENTRY";
+        String body = "Only 100/100 indicator score (not guaranteed WIN). Entry " + entryWindow +
                       ". Expiry " + expiryTime + " (paper quote only)";
         pushNotification(title, body);
     }
