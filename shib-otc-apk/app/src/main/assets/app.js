@@ -430,57 +430,35 @@ function render(){
   $('#assetName').textContent=isPepe?'PEPE / OTC':'SHIB / OTC';
   $('#chartTitle').textContent=isPepe?'Olymptrade PEPE OTC • Feed validation':'Olymptrade SHIB OTC feed';
   $('#chartSub').textContent=isPepe?'PEPEUSD_OTC • awaiting verified price points':'SHIBUSD_OTC • 5-minute close points';
-  $('#assetNotice').textContent=isPepe?'PEPE OTC: checking Olymptrade PEPEUSD_OTC source; trades blocked until verified':'SHIB OTC: source freshness and prices are checked';
+  $('#assetNotice').textContent=isPepe?'PEPE OTC: endpoint prices available when green; terminal matching still unverified':'SHIB OTC: endpoint freshness checked; terminal matching unverified';
   $('#price').textContent=priceText(p);
   const ch=lastRenderedPrice&&p!=null?(p-lastRenderedPrice)/lastRenderedPrice*100:0;if(p!=null)lastRenderedPrice=p;
-  $('#priceChange').textContent=(ch>=0?'+':'')+ch.toFixed(3)+'%';
+  $('#priceChange').textContent=p==null?'—':(ch>=0?'+':'')+ch.toFixed(3)+'%';
   const stale=isFeedStale(),threshold=+$('#threshold').value||78,activeSignal=(!stale&&state.feedOk&&!a.exhaustionBlocked&&a.confidence>=threshold&&a.score>=55)?a.side:'NONE';
   const s=$('#signal');s.textContent=stale?'NO TRADE • FEED STALE':activeSignal==='NONE'?'NO TRADE':(a.confidence>=88&&state.learning.total>=20?'SUPER STRONG ':'STRONG ')+activeSignal;s.className=activeSignal==='UP'?'up':activeSignal==='DOWN'?'down':'neutral';
-  $('#confidence').textContent=`Adaptive ${a.confidence}/100 • Base ${a.baseConfidence}/100`;$('#scoreFill').style.width=a.confidence+'%';$('#reason').textContent=a.reason;
-  const ultimateReasons=[];
-  const uf=a.features;
-  let ultimateSide='NONE';
-  if(!state.feedOk||stale)ultimateReasons.push('Verified fresh feed required');
-  if(state.points.length<55)ultimateReasons.push('Need at least 55 price points');
-  if(!uf)ultimateReasons.push('Indicators not ready');
-  if(uf&&state.feedOk&&!stale&&state.points.length>=55){
-    const up=a.side==='UP'&&uf.emaTrend==='bull'&&uf.macd==='pos'&&uf.R>=52&&uf.R<65&&uf.st>=55&&uf.st<80&&uf.bbPos==='upper'&&uf.volPct>.02&&uf.volPct<.7&&uf.slope>.08&&a.scoreGap>=25&&a.confidence>=90&&!a.exhaustionBlocked;
-    const down=a.side==='DOWN'&&uf.emaTrend==='bear'&&uf.macd==='neg'&&uf.R>35&&uf.R<=48&&uf.st>20&&uf.st<=45&&uf.bbPos==='lower'&&uf.volPct>.02&&uf.volPct<.7&&uf.slope<-.08&&a.scoreGap>=25&&a.confidence>=90&&!a.exhaustionBlocked;
-    if(up)ultimateSide='UP';
-    else if(down)ultimateSide='DOWN';
-    else ultimateReasons.push('EMA, RSI, MACD, Stochastic, Bollinger, volatility, score and directional gap not fully aligned');
-  }
+  $('#confidence').textContent=`Signal score ${a.confidence}/100 • Base ${a.baseConfidence}/100 (not win probability)`;$('#scoreFill').style.width=a.confidence+'%';$('#reason').textContent=a.reason;
+  const ultimateSide=ultimateDirection(a); // same predicate as virtual Ultimate entry
   $('#ultimateSignal').textContent=ultimateSide==='NONE'?'NO ULTIMATE SIGNAL':'ULTIMATE STRONG '+ultimateSide;
   $('#ultimateSignal').className=ultimateSide==='UP'?'up':ultimateSide==='DOWN'?'down':'neutral';
-  $('#ultimateReason').textContent=ultimateSide==='NONE'?ultimateReasons.join(' • '):'All strict filters agree on the latest available candle. Experimental indicator agreement; no accuracy guarantee.';
+  $('#ultimateReason').textContent=ultimateSide!=='NONE'
+    ?'Strict filters aligned on available candle. Experimental score, NOT a win probability.'
+    :!state.feedOk||stale?'Waiting for fresh quote data; check Signal Health below.'
+    :state.points.length<55?'Waiting for 55 candles: '+state.points.length+'/55'
+    :'Ultimate requires matched EMA, RSI, MACD, Stochastic, Bollinger, volatility and score >=90.';
   const health=[];
-  if(!state.feedOk)health.push('FEED ERROR: '+(state.feedError||'Data not verified'));
-  if(stale)health.push('STALE: last candle is more than 12 minutes old or missing');
-  if(state.points.length<55)health.push('WARMUP: '+state.points.length+'/55 candles available');
+  if(!state.feedOk)health.push('FEED ERROR: '+(state.feedError||'No fresh quote'));
+  if(stale)health.push('STALE: no recent source candle');
+  if(state.points.length<55)health.push('WARMUP: '+state.points.length+'/55 candles');
   if(a.side==='NONE')health.push('DIRECTION: no clear UP/DOWN');
-  if(a.side!=='NONE'&&a.exhaustionBlocked){
-    const f=a.features||{};
-    if(a.side==='UP'){
-      if(f.st>=80)health.push('UP BLOCK: Stochastic '+f.st.toFixed(1)+' >= 80');
-      if(f.R>=65)health.push('UP BLOCK: RSI '+f.R.toFixed(1)+' >= 65');
-      if(f.macd==='neg')health.push('UP BLOCK: MACD opposite');
-      if(f.volPct>=.7)health.push('UP BLOCK: volatility >= 0.7%');
-      if(f.bbPos==='above')health.push('UP BLOCK: price above Bollinger upper band');
-    }else{
-      if(f.st<=20)health.push('DOWN BLOCK: Stochastic '+f.st.toFixed(1)+' <= 20');
-      if(f.R<=35)health.push('DOWN BLOCK: RSI '+f.R.toFixed(1)+' <= 35');
-      if(f.macd==='pos')health.push('DOWN BLOCK: MACD opposite');
-      if(f.volPct>=.7)health.push('DOWN BLOCK: volatility >= 0.7%');
-      if(f.bbPos==='below')health.push('DOWN BLOCK: price below Bollinger lower band');
-    }
-  }
+  if(a.blockReasons?.length)health.push(...a.blockReasons.map(x=>'SAFETY BLOCK: '+x));
   if(a.confidence<threshold)health.push('SCORE BLOCK: '+a.confidence+' below minimum '+threshold);
   if(a.score<55)health.push('STRENGTH BLOCK: '+a.score+' below 55');
   if(!$('#autoMode').checked)health.push('AUTO MODE: disabled');
-  if(state.active)health.push('ACTIVE: virtual trade already open');
-  if(state.lastTradeTs&&state.lastSourceTs<state.lastTradeTs+(Math.max(1,+$('#cooldown').value||1))*(state.sourceFrame||300))health.push('COOLDOWN: waiting for eligible candle');
-  if(!health.length)health.push('READY: filters pass; waiting for next new candle');
-  $('#signalHealth').textContent='Asset: '+selectedAsset+' | Candle: '+(state.lastSourceTs?new Date(state.lastSourceTs*1000).toLocaleString():'none')+' | Data points: '+state.points.length+' | Side: '+a.side+' | Score: '+a.confidence+'\n'+health.join('\n');
+  if(state.active)health.push('ACTIVE: another paper trade is open');
+  if(state.lastTradeTs&&state.lastSourceTs<state.lastTradeTs+(Math.max(1,+$('#cooldown').value||1))*(state.sourceFrame||300))health.push('COOLDOWN: waiting for next eligible candle');
+  if(!health.length)health.push('READY: conditions pass; waits for new source candle');
+  $('#signalHealth').textContent='Asset: '+selectedAsset+' | Last source candle: '+(state.lastSourceTs?new Date(state.lastSourceTs*1000).toLocaleString():'none')+' | Points: '+state.points.length+' | Direction: '+a.side+' | Score: '+a.confidence+'/100 (NOT accuracy)\n'+health.join('\n');
+  renderDailyAudit();
   const action=$('#signalAction');
   if(state.active){
     action.textContent=`✅ VIRTUAL TRADE TAKEN • ${sideText(state.active.side)} • ₹${state.active.stake} • Entry ${priceText(state.active.entry)}`;
@@ -497,7 +475,7 @@ function render(){
     action.className='muted';
   }
   const dot=$('#feedDot'),fs=$('#feedStatus');
-  if(state.feedOk&&!stale){dot.style.background='#33d17a';fs.textContent=`OLYMPTRADE SHIB OTC • official public feed • ${Math.round(state.sourceFrame/60)}m • ${new Date(state.lastSourceTs*1000).toLocaleTimeString()}`}
+  if(state.feedOk&&!stale){dot.style.background='#33d17a';fs.textContent=`OLYMPTRADE ${isPepe?'PEPE':'SHIB'} OTC • endpoint prices (not terminal-verified) • ${Math.round(state.sourceFrame/60)}m • ${new Date(state.lastSourceTs*1000).toLocaleTimeString()}`}
   else{dot.style.background='#ff667e';fs.textContent=(isPepe?'PEPE OTC':'SHIB OTC')+' FEED • '+(state.feedError||'STALE / waiting')}
   $('#alertsToggle').checked=state.alertsEnabled;
   $('#balance').textContent=fmt(state.balance);const pnl=state.balance-state.startBalance+(state.active?state.active.stake:0);$('#pnl').textContent='P/L '+fmt(pnl);
