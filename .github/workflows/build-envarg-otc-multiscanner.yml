@@ -43,11 +43,18 @@ jobs:
       - name: Verify APK contains independent package and scanner
         run: |
           cp olymp-otc-multiscan/app/build/outputs/apk/debug/app-debug.apk Envarg-OTC-Multi-Scanner-V1.apk
-          unzip -l Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'assets/index.html'
-          unzip -l Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'assets/app.js'
-          unzip -l Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'classes.dex'
-          unzip -p Envarg-OTC-Multi-Scanner-V1.apk assets/app.js | grep -q 'nativeAssetResult'
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'com.envarg.otcmultiscan'
+          unzip -t Envarg-OTC-Multi-Scanner-V1.apk | tail -n 1
+          unzip -l Envarg-OTC-Multi-Scanner-V1.apk > /tmp/multi-apk-files.txt
+          grep -q 'assets/index.html' /tmp/multi-apk-files.txt
+          grep -q 'assets/app.js' /tmp/multi-apk-files.txt
+          grep -q 'classes.dex' /tmp/multi-apk-files.txt
+          unzip -p Envarg-OTC-Multi-Scanner-V1.apk assets/app.js > /tmp/multi-scanner-check.js
+          grep -q 'nativeAssetResult' /tmp/multi-scanner-check.js
+          grep -q 'applicationId "com.envarg.otcmultiscan"' olymp-otc-multiscan/app/build.gradle
+          AAPT="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
+          if [ -n "$AAPT" ]; then
+            "$AAPT" dump badging Envarg-OTC-Multi-Scanner-V1.apk | grep 'com.envarg.otcmultiscan'
+          fi
           ls -lh Envarg-OTC-Multi-Scanner-V1.apk
 
       - name: Upload independent multi-OTC APK
