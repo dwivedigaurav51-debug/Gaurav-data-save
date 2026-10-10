@@ -58,6 +58,11 @@ function validPoints(n=80,spacing=300,oldAge=0){
  }));
 }
 const payload=(symbol,candles,frame=300)=>JSON.stringify({asset:{symbol},charts:[{candle_frame:frame,candles}]});
+const synthetic100=Array.from({length:100},(_,i)=>({ts:now-(99-i)*300,c:1.2-i*.0003+.003*Math.sin(i*2*Math.PI/11)}));
+const score100=query('candleAnalysis('+JSON.stringify(synthetic100)+')');
+assert.equal(score100.score,100,'Real scoring conditions must be able to produce exactly 100/100');
+assert.equal(score100.strong,true,'Strict 100/100 directional setup is reachable without faking the score');
+assert.equal(score100.side,'DOWN');
 sandbox.window.nativeAssetResult('EURUSD_OTC',payload('EURUSD_OTC',validPoints()));
 assert.equal(query('STATES.EURUSD_OTC.status'),'LIVE','Fresh asset accepted');
 assert.equal(query('STATES.EURUSD_OTC.dataCount'),80);
@@ -82,6 +87,7 @@ query("addSignal(INDEX.EURUSD_OTC,{side:'UP',strong:true,score:100,lastTs:STATES
 query("addSignal(INDEX.EURUSD_OTC,{side:'UP',strong:true,score:100,lastTs:STATES.EURUSD_OTC.lastTs,price:1.24})");
 assert.equal(alerts.length,1,'Only 100/100 entry alert, once per candle');
 assert.equal(alerts[0][2],'100','Notification must show score 100');
+assert.equal(alerts[0].length,5,'Signal notification includes entry window and expiry');
 assert.equal(query('history.length'),1,'100/100 signal persisted once');
 assert.equal(query('window.PaperVirtual.getWallet().trades.length'),1,'100/100 opens the virtual trade');
 assert(query("$('#assetList').innerHTML.includes('EUR/USD OTC')"));
