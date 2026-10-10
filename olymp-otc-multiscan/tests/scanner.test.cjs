@@ -4,12 +4,13 @@ const path=require('node:path');
 const vm=require('node:vm');
 const base=path.resolve(__dirname,'..');
 const script=fs.readFileSync(path.join(base,'app/src/main/assets/app.js'),'utf8');
+const paperScript=fs.readFileSync(path.join(base,'app/src/main/assets/paper.js'),'utf8');
 const html=fs.readFileSync(path.join(base,'app/src/main/assets/index.html'),'utf8');
 const java=fs.readFileSync(path.join(base,'app/src/main/java/com/envarg/otcmultiscan/MainActivity.java'),'utf8');
 const manifest=fs.readFileSync(path.join(base,'app/src/main/AndroidManifest.xml'),'utf8');
 const gradle=fs.readFileSync(path.join(base,'app/build.gradle'),'utf8');
 const uiIds=new Set([...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]));
-const selectors=[...script.matchAll(/\$\(['"]#([^'"]+)['"]\)/g)].map(m=>m[1]);
+const selectors=[...script.matchAll(/\$\(['"]#([^'"]+)['"]\)/g),...paperScript.matchAll(/\$\(['"]#([^'"]+)['"]\)/g)].map(m=>m[1]);
 for(const id of selectors)assert(uiIds.has(id),'Missing HTML element '+id);
 assert(gradle.includes('applicationId "com.envarg.otcmultiscan"'));
 assert(manifest.includes('Envarg OTC Multi Scanner'));
@@ -39,6 +40,7 @@ const sandbox={window:{MultiBridge:bridge},document:fakeDocument,
  setInterval:(fn,ms)=>{intervals.push({fn,ms})},
  confirm:()=>true,console,Date,Math,JSON,Number,String,Array,Set,Map,Intl};
 vm.createContext(sandbox);
+vm.runInContext(paperScript,sandbox,{filename:'paper.js',timeout:5000});
 vm.runInContext(script,sandbox,{filename:'app.js',timeout:5000});
 const query=src=>vm.runInContext(src,sandbox,{timeout:5000});
 assert.equal(bridge.scans,1,'Scanner starts on app launch');
