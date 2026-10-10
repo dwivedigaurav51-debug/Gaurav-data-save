@@ -147,6 +147,7 @@ window.PaperVirtual=(()=>{
  function getTrade(symbol,sourceTs){
   return wallet.trades.find(t=>t.symbol===symbol&&(t.signalSourceTs??t.sourceTs)===sourceTs)||null;
  }
+ function isQueued(symbol,sourceTs){return wallet.armed.some(t=>t.symbol===symbol&&t.sourceTs===sourceTs)}
  function totals(){
   const all=wallet.trades;
   const wins=all.filter(t=>t.status==='WIN').length;
@@ -241,5 +242,5 @@ window.PaperVirtual=(()=>{
    if(!confirm('Reset ONLY Multi Scanner virtual balance, trade history and accuracy to ₹10,000?'))return;
    wallet=fallback();save();render();
  });
- return {onStrong,onQuote,onFeed,getTrade,totals,render,renderOpen,expireQueued,getWallet:()=>wallet};
+ return {onStrong,onQuote,onFeed,getTrade,isQueued,totals,render,renderOpen,expireQueued,getWallet:()=>wallet};
 })();
