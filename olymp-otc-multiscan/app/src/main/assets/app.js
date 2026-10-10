@@ -12,7 +12,8 @@ const INDEX = Object.fromEntries(ASSETS.map(a=>[a.symbol,a]));
 const STATES = Object.fromEntries(ASSETS.map(a=>[a.symbol,{status:'WAITING',lastTs:0,price:null,score:0,side:'NONE',strong:false,error:'',reason:'Scan not run',dataCount:0,frame:0,checkedAt:0}]));
 const POLL_INTERVAL=300000; // one five-minute source candle
 const SCAN_OFFSET=12000; // aim for shortly after each 5-minute source boundary
-const ALERT_FRESHNESS=420000; // never alert on an old candle
+const ALERT_FRESHNESS=420000; // 5m last-close quotes may reach us one cycle late
+const REQUIRED_SCORE=100; // strict indicator agreement, NOT a predicted win rate
 let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),activeTab='all',scanDoneCount=0,seenResults=new Set();
 let history=readStore('envargMultiSignalHistoryV1',[]);
 let seen=readStore('envargMultiSignalSeenV1',{});
@@ -137,9 +138,10 @@ function candleAnalysis(points){
 }
 function latestMatches(){
  const now=Date.now();
- return ASSETS.map(a=>({asset:a,...STATES[a.symbol]})).filter(a=>a.strong&&a.status==='LIVE'&&now-a.lastTs*1000<=ALERT_FRESHNESS).sort((a,b)=>b.score-a.score||a.asset.name.localeCompare(b.asset.name));
+ return ASSETS.map(a=>({asset:a,...STATES[a.symbol]})).filter(a=>a.strong&&a.score===REQUIRED_SCORE&&a.status==='LIVE'&&now-a.lastTs*1000<=ALERT_FRESHNESS).sort((a,b)=>b.score-a.score||a.asset.name.localeCompare(b.asset.name));
 }
 function addSignal(asset,state){
+ if(state.score!==REQUIRED_SCORE||!state.strong||state.side==='NONE')return;
  const symbol=asset.symbol,key=String(state.lastTs);
  if(seen[symbol]===key)return;
  const now=Date.now();
@@ -147,7 +149,7 @@ function addSignal(asset,state){
  seen[symbol]=key;writeStore('envargMultiSignalSeenV1',seen);
  const item={symbol,name:asset.name,side:state.side,score:state.score,price:state.price,candleTs:state.lastTs,detected:now,entryFrom:paper.entryFrom,entryUntil:paper.entryUntil,expiryAt:paper.expiryAt,paperTradeId:paper.tradeId||null,paperStatus:paper.status,paperReason:paper.reason||''};
  history.unshift(item);history=history.slice(0,120);writeStore('envargMultiSignalHistoryV1',history);
- if(notifications&&window.MultiBridge?.notifySignal){
+ if(paper.opened&&notifications&&window.MultiBridge?.notifySignal){
    const buyWindow=paper.opened?prettyTime(paper.entryFrom)+' - '+prettyTime(paper.entryUntil):'ENTRY CLOSED / PAPER SKIPPED';
    const expiry=paper.opened?prettyTime(paper.expiryAt):'—';
    window.MultiBridge.notifySignal(symbol,state.side,String(state.score),buyWindow,expiry);
@@ -162,11 +164,13 @@ window.nativeAssetResult=function(symbol,rawText){
   if(age>720000)throw Error('Stale 5m candles ('+Math.round(age/60000)+'min old)');
   // Settle previously opened paper trades only from eligible *later* 5-minute quotes.
   // A source error or missing expiry candle never becomes a guessed WIN/LOSS.
-  PAPER.onFeed(symbol,points,now,notifications);
+  PAPER.onFeed(symbol,points,now,false); // no result alerts: signal entry alerts only
+  PAPER.onQuote(symbol,points,now,notifications); // fills previously queued 100/100 signal
   const result=candleAnalysis(points);
+  const qualified=result.valid&&result.strong&&result.score===REQUIRED_SCORE;
   Object.assign(old,{status:result.valid?'LIVE':'WARMUP',lastTs:last.ts,price:last.c,score:result.score||0,
-    side:result.side||'NONE',strong:!!result.strong,error:'',reason:result.reason,dataCount:points.length,frame:300,checkedAt:now});
-  if(result.strong&&age<=ALERT_FRESHNESS)addSignal(INDEX[symbol],old);
+    side:result.side||'NONE',strong:qualified,error:'',reason:result.valid&&!qualified&&result.strong?'Score '+result.score+'/100 (only 100/100 accepted)':result.reason,dataCount:points.length,frame:300,checkedAt:now});
+  if(qualified&&age<=ALERT_FRESHNESS)addSignal(INDEX[symbol],old);
  }catch(ex){
   Object.assign(old,{status:'ERROR',strong:false,side:'NONE',score:0,checkedAt:now,error:String(ex.message||ex).slice(0,160),reason:'Unable to validate feed'});
  }
@@ -230,8 +234,9 @@ function updateUI(){
  $('#totalCount').textContent=ASSETS.length;
  $('#liveCount').textContent=ASSETS.filter(a=>['LIVE','WARMUP'].includes(STATES[a.symbol].status)).length;
  $('#strongCount').textContent=matches.length;
+ $('#scorePolicy').textContent='ONLY 100/100 · no 99/100 trades or alerts';
  $('#errorCount').textContent=ASSETS.filter(a=>['ERROR','STALE'].includes(STATES[a.symbol].status)).length;
- $('#strongBadge').textContent=matches.length+' strong';
+ $('#strongBadge').textContent=matches.length+' (100/100)';
  $('#strongSignals').innerHTML=matches.length?matches.map(s=>{
   const h=history.find(row=>row.symbol===s.asset.symbol&&row.candleTs===s.lastTs);
   const trade=PAPER.getTrade(s.asset.symbol,s.lastTs);
@@ -241,7 +246,7 @@ function updateUI(){
   const buyText=trade
    ?'PAPER ENTRY '+prettyTime(trade.entryFrom)+' – '+prettyTime(trade.entryUntil)+' · EXP '+prettyTime(exp)
    :h
-    ?(h.entryUntil>Date.now()?'ENTRY WINDOW '+prettyTime(openAt)+' – '+prettyTime(until):'ENTRY WINDOW CLOSED / NO PAPER TRADE')
+    ?(h.paperStatus==='WAITING_ENTRY'?'100/100 · WAITING NEXT VERIFIED 5m CANDLE':h.entryUntil>Date.now()?'ENTRY WINDOW '+prettyTime(openAt)+' – '+prettyTime(until):'ENTRY WINDOW CLOSED / NO PAPER TRADE')
     :'Checking entry timing…';
   return '<div class="signalrow '+(s.side==='DOWN'?'down':'')+'"><div><span class="assetname">'+esc(s.asset.name)+'</span>'+
   '<span class="meta">Latest price '+esc(fmtPrice(s.price))+' · candle '+esc(prettyTime(s.lastTs*1000))+'</span>'+
@@ -277,9 +282,9 @@ function updateUI(){
   const trade=PAPER.getTrade(row.symbol,row.candleTs);
   const timing=trade
     ?'ENTRY '+prettyTime(trade.entryFrom)+'–'+prettyTime(trade.entryUntil)+' · EXP '+prettyTime(trade.expiresAt)+' · '+trade.status
-    :row.entryFrom
-     ?(row.paperReason||'ENTRY WINDOW CLOSED')+' · Signal '+prettyTime(row.entryFrom)
-     :'Legacy signal (no paper trade)';
+    :row.paperStatus==='WAITING_ENTRY'?'100/100 QUEUED · next fresh candle needed'
+    :row.entryFrom?(row.paperReason||'ENTRY WINDOW CLOSED')+' · Signal '+prettyTime(row.entryFrom)
+     :'Legacy pre-100/100 signal (no new trade)';
   return '<div class="historyrow"><div><strong>'+esc(row.name)+'</strong> · '+esc(prettyTime(row.detected))+
   '<small>Candle '+esc(prettyTime(row.candleTs*1000))+' · Quote '+esc(fmtPrice(row.price))+'</small>'+
   '<small>'+esc(timing)+'</small></div>'+
