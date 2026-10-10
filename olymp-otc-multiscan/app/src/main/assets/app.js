@@ -1,5 +1,7 @@
 'use strict';
 const $ = selector => document.querySelector(selector);
+const PAPER=window.PaperVirtual;
+if(!PAPER)throw Error('Missing virtual trading engine');
 const FX = ['EURUSD','GBPUSD','USDJPY','USDCHF','USDCAD','AUDUSD','NZDUSD','EURJPY','EURGBP','EURCHF','EURCAD','EURAUD','EURNZD','GBPJPY','GBPCHF','GBPCAD','GBPAUD','GBPNZD','AUDJPY','AUDCAD','AUDCHF','AUDNZD','CADJPY','CADCHF','CHFJPY'];
 const CRYPTO = [['BTCUSD','Bitcoin'],['ETHUSD','Ethereum'],['DOGUSD','Dogecoin'],['PEPEUSD','PEPE'],['LTCUSD','Litecoin'],['XRPUSD','Ripple'],['SOLUSD','Solana']];
 const ASSETS = [
@@ -139,10 +141,16 @@ function latestMatches(){
 function addSignal(asset,state){
  const symbol=asset.symbol,key=String(state.lastTs);
  if(seen[symbol]===key)return;
+ const now=Date.now();
+ const paper=PAPER.onStrong(asset,state,now);
  seen[symbol]=key;writeStore('envargMultiSignalSeenV1',seen);
- const item={symbol,name:asset.name,side:state.side,score:state.score,price:state.price,candleTs:state.lastTs,detected:Date.now()};
+ const item={symbol,name:asset.name,side:state.side,score:state.score,price:state.price,candleTs:state.lastTs,detected:now,entryFrom:paper.entryFrom,entryUntil:paper.entryUntil,expiryAt:paper.expiryAt,paperTradeId:paper.tradeId||null,paperStatus:paper.status,paperReason:paper.reason||''};
  history.unshift(item);history=history.slice(0,120);writeStore('envargMultiSignalHistoryV1',history);
- if(notifications&&window.MultiBridge?.notifySignal)window.MultiBridge.notifySignal(symbol,state.side,String(state.score));
+ if(notifications&&window.MultiBridge?.notifySignal){
+   const buyWindow=paper.opened?prettyTime(paper.entryFrom)+' - '+prettyTime(paper.entryUntil):'ENTRY CLOSED / PAPER SKIPPED';
+   const expiry=paper.opened?prettyTime(paper.expiryAt):'—';
+   window.MultiBridge.notifySignal(symbol,state.side,String(state.score),buyWindow,expiry);
+ }
 }
 window.nativeAssetResult=function(symbol,rawText){
  if(!inFlight||!INDEX[symbol]||seenResults.has(symbol))return;
@@ -151,6 +159,9 @@ window.nativeAssetResult=function(symbol,rawText){
  try{
   const points=normalizeSource(rawText,symbol),last=points.at(-1),age=now-last.ts*1000;
   if(age>720000)throw Error('Stale 5m candles ('+Math.round(age/60000)+'min old)');
+  // Settle previously opened paper trades only from eligible *later* 5-minute quotes.
+  // A source error or missing expiry candle never becomes a guessed WIN/LOSS.
+  PAPER.onFeed(symbol,points,now,notifications);
   const result=candleAnalysis(points);
   Object.assign(old,{status:result.valid?'LIVE':'WARMUP',lastTs:last.ts,price:last.c,score:result.score||0,
     side:result.side||'NONE',strong:!!result.strong,error:'',reason:result.reason,dataCount:points.length,frame:300,checkedAt:now});
@@ -221,8 +232,19 @@ function updateUI(){
  $('#errorCount').textContent=ASSETS.filter(a=>['ERROR','STALE'].includes(STATES[a.symbol].status)).length;
  $('#strongBadge').textContent=matches.length+' strong';
  $('#strongSignals').innerHTML=matches.length?matches.map(s=>{
+  const h=history.find(row=>row.symbol===s.asset.symbol&&row.candleTs===s.lastTs);
+  const trade=PAPER.getTrade(s.asset.symbol,s.lastTs);
+  const openAt=h?.entryFrom;
+  const until=h?.entryUntil;
+  const exp=trade?.expiresAt||h?.expiryAt;
+  const buyText=trade
+   ?'PAPER ENTRY '+prettyTime(trade.entryFrom)+' – '+prettyTime(trade.entryUntil)+' · EXP '+prettyTime(exp)
+   :h
+    ?(h.entryUntil>Date.now()?'ENTRY WINDOW '+prettyTime(openAt)+' – '+prettyTime(until):'ENTRY WINDOW CLOSED / NO PAPER TRADE')
+    :'Checking entry timing…';
   return '<div class="signalrow '+(s.side==='DOWN'?'down':'')+'"><div><span class="assetname">'+esc(s.asset.name)+'</span>'+
-  '<span class="meta">Latest price '+esc(fmtPrice(s.price))+' · candle '+esc(prettyTime(s.lastTs*1000))+'</span></div>'+
+  '<span class="meta">Latest price '+esc(fmtPrice(s.price))+' · candle '+esc(prettyTime(s.lastTs*1000))+'</span>'+
+  '<span class="meta-timing '+(!trade?'closed':'')+'">'+esc(buyText)+'</span></div>'+
   '<div><div class="side '+(s.side==='DOWN'?'down':'')+'">'+s.side+' '+(s.side==='UP'?'↑':'↓')+'</div>'+
   '<div class="score">Strong score '+s.score+'/100</div></div></div>'
  }).join(''):'<p class="empty">अभी कोई ताज़ा Strong Signal नहीं मिला। नीचे देखो कौन-सी करेंसी की फीड काम कर रही है और कौन-सी शर्तें पूरी नहीं हैं।</p>';
@@ -250,11 +272,18 @@ function updateUI(){
    '<div class="right"><strong class="price">'+esc(fmtPrice(s.price))+'</strong>'+
    '<span class="status '+(hit?'hot':quality)+'">'+esc(hit?'STRONG '+s.side+' · '+s.score:status)+'</span></div></article>'
  }).join(''):'<p class="empty">इस फिल्टर में कोई करेंसी नहीं मिली।</p>';
- $('#signalHistory').innerHTML=history.length?history.slice(0,45).map(row=>
-  '<div class="historyrow"><div><strong>'+esc(row.name)+'</strong> · '+esc(prettyTime(row.detected))+
-  '<small>Candle '+esc(prettyTime(row.candleTs*1000))+' · Entry quote '+esc(fmtPrice(row.price))+'</small></div>'+
-  '<div><div class="side '+(row.side==='DOWN'?'down':'')+'">'+esc(row.side)+'</div><div class="score">'+Number(row.score||0)+'/100</div></div></div>'
- ).join(''):'<p class="empty">अभी कोई Strong Signal दर्ज नहीं है।</p>';
+ $('#signalHistory').innerHTML=history.length?history.slice(0,45).map(row=>{
+  const trade=PAPER.getTrade(row.symbol,row.candleTs);
+  const timing=trade
+    ?'ENTRY '+prettyTime(trade.entryFrom)+'–'+prettyTime(trade.entryUntil)+' · EXP '+prettyTime(trade.expiresAt)+' · '+trade.status
+    :row.entryFrom
+     ?(row.paperReason||'ENTRY WINDOW CLOSED')+' · Signal '+prettyTime(row.entryFrom)
+     :'Legacy signal (no paper trade)';
+  return '<div class="historyrow"><div><strong>'+esc(row.name)+'</strong> · '+esc(prettyTime(row.detected))+
+  '<small>Candle '+esc(prettyTime(row.candleTs*1000))+' · Quote '+esc(fmtPrice(row.price))+'</small>'+
+  '<small>'+esc(timing)+'</small></div>'+
+  '<div><div class="side '+(row.side==='DOWN'?'down':'')+'">'+esc(row.side)+'</div><div class="score">'+Number(row.score||0)+'/100</div></div></div>';
+ }).join(''):'<p class="empty">अभी कोई Strong Signal दर्ज नहीं है।</p>';
  const checked=ASSETS.filter(a=>seenResults.has(a.symbol)).length;
  $('#scanBtn').disabled=inFlight;
  $('#scanBtn').textContent=inFlight?'Scanning…':'↻ Scan Now';
@@ -266,6 +295,7 @@ function updateUI(){
  $('#lastScan').textContent=prettyTime(startedAt);
  $('#completedScan').textContent=prettyTime(completedAt);
  $('#nextScan').textContent=startedAt?prettyTime(startedAt+POLL_INTERVAL):'—';
+ PAPER.render();
 }
 $('#search').addEventListener('input',updateUI);
 document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener('click',()=>{
@@ -289,4 +319,5 @@ if(notifications&&window.MultiBridge?.requestNotificationPermission)window.Multi
 updateUI();
 startScan();
 setInterval(()=>{if(!inFlight&&Date.now()-lastStart>=POLL_INTERVAL)startScan()},15000);
-setInterval(updateUI,60000);
+setInterval(updateUI,30000);
+setInterval(()=>PAPER.renderOpen(),1000);
