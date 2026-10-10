@@ -23,7 +23,9 @@ jobs:
       - name: Validate multi-asset logic
         run: |
           node --check olymp-otc-multiscan/app/src/main/assets/app.js
+          node --check olymp-otc-multiscan/app/src/main/assets/paper.js
           node olymp-otc-multiscan/tests/scanner.test.cjs
+          node olymp-otc-multiscan/tests/paper-trades.test.cjs
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -42,24 +44,29 @@ jobs:
 
       - name: Verify APK contains independent package and scanner
         run: |
-          cp olymp-otc-multiscan/app/build/outputs/apk/debug/app-debug.apk Envarg-OTC-Multi-Scanner-V1.apk
-          unzip -t Envarg-OTC-Multi-Scanner-V1.apk | tail -n 1
-          unzip -l Envarg-OTC-Multi-Scanner-V1.apk > /tmp/multi-apk-files.txt
+          cp olymp-otc-multiscan/app/build/outputs/apk/debug/app-debug.apk Envarg-OTC-Multi-Scanner-V2.apk
+          unzip -t Envarg-OTC-Multi-Scanner-V2.apk | tail -n 1
+          unzip -l Envarg-OTC-Multi-Scanner-V2.apk > /tmp/multi-apk-files.txt
           grep -q 'assets/index.html' /tmp/multi-apk-files.txt
           grep -q 'assets/app.js' /tmp/multi-apk-files.txt
+          grep -q 'assets/paper.js' /tmp/multi-apk-files.txt
           grep -q 'classes.dex' /tmp/multi-apk-files.txt
-          unzip -p Envarg-OTC-Multi-Scanner-V1.apk assets/app.js > /tmp/multi-scanner-check.js
+          unzip -p Envarg-OTC-Multi-Scanner-V2.apk assets/app.js > /tmp/multi-scanner-check.js
           grep -q 'nativeAssetResult' /tmp/multi-scanner-check.js
+          unzip -p Envarg-OTC-Multi-Scanner-V2.apk assets/paper.js > /tmp/paper-trades-check.js
+          grep -q 'PAPER' /tmp/multi-scanner-check.js
+          grep -q 'paperWins' /tmp/paper-trades-check.js
+          grep -q 'versionName "2.0"' olymp-otc-multiscan/app/build.gradle
           grep -q 'applicationId "com.envarg.otcmultiscan"' olymp-otc-multiscan/app/build.gradle
           AAPT="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
           if [ -n "$AAPT" ]; then
-            "$AAPT" dump badging Envarg-OTC-Multi-Scanner-V1.apk | grep 'com.envarg.otcmultiscan'
+            "$AAPT" dump badging Envarg-OTC-Multi-Scanner-V2.apk | grep 'com.envarg.otcmultiscan'
           fi
-          ls -lh Envarg-OTC-Multi-Scanner-V1.apk
+          ls -lh Envarg-OTC-Multi-Scanner-V2.apk
 
       - name: Upload independent multi-OTC APK
         uses: actions/upload-artifact@v4
         with:
-          name: Envarg-OTC-Multi-Scanner-V1
-          path: Envarg-OTC-Multi-Scanner-V1.apk
+          name: Envarg-OTC-Multi-Scanner-V2
+          path: Envarg-OTC-Multi-Scanner-V2.apk
           retention-days: 30
