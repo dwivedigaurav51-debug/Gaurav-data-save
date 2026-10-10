@@ -15,8 +15,8 @@ const SCAN_OFFSET=12000; // aim for shortly after each 5-minute source boundary
 const ALERT_FRESHNESS=420000; // 5m last-close quotes may reach us one cycle late
 const REQUIRED_SCORE=100; // strict indicator agreement, NOT a predicted win rate
 let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),activeTab='all',scanDoneCount=0,seenResults=new Set();
-let history=readStore('envargMultiSignalHistoryV1',[]);
-let seen=readStore('envargMultiSignalSeenV1',{});
+let history=readStore('envargMultiSignalHistoryV3_100only',[]);
+let seen=readStore('envargMultiSignalSeenV3_100only',{});
 let notifications=readStore('envargMultiNotificationsV1',true);
 
 function readStore(key,fallback){
@@ -146,9 +146,9 @@ function addSignal(asset,state){
  if(seen[symbol]===key)return;
  const now=Date.now();
  const paper=PAPER.onStrong(asset,state,now);
- seen[symbol]=key;writeStore('envargMultiSignalSeenV1',seen);
+ seen[symbol]=key;writeStore('envargMultiSignalSeenV3_100only',seen);
  const item={symbol,name:asset.name,side:state.side,score:state.score,price:state.price,candleTs:state.lastTs,detected:now,entryFrom:paper.entryFrom,entryUntil:paper.entryUntil,expiryAt:paper.expiryAt,paperTradeId:paper.tradeId||null,paperStatus:paper.status,paperReason:paper.reason||''};
- history.unshift(item);history=history.slice(0,120);writeStore('envargMultiSignalHistoryV1',history);
+ history.unshift(item);history=history.slice(0,120);writeStore('envargMultiSignalHistoryV3_100only',history);
  if(paper.opened&&notifications&&window.MultiBridge?.notifySignal){
    const buyWindow=paper.opened?prettyTime(paper.entryFrom)+' - '+prettyTime(paper.entryUntil):'ENTRY CLOSED / PAPER SKIPPED';
    const expiry=paper.opened?prettyTime(paper.expiryAt):'—';
@@ -313,7 +313,7 @@ document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener(
 $('#scanBtn').addEventListener('click',()=>startScan(true));
 $('#clearHistory').addEventListener('click',()=>{
  if(confirm('Clear Multi Scanner signal history only?')){
-  history=[];writeStore('envargMultiSignalHistoryV1',history);updateUI();
+  history=[];writeStore('envargMultiSignalHistoryV3_100only',history);updateUI();
  }
 });
 $('#alertToggle').checked=!!notifications;
