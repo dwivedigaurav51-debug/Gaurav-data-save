@@ -278,6 +278,41 @@ function renderUltimate(){
   }).join(''):'No trades yet';
 }
 
+// Counts start when this version runs and only include new candles seen while the app is open.
+function localDayKey(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function getSignalAudit(){
+  const day=localDayKey();
+  if(!state.signalAudit||state.signalAudit.day!==day){
+    state.signalAudit={day,scans:0,deepQualified:0,ultimateQualified:0,deepOpened:0,ultimateOpened:0,blocked:{},recent:[]};
+  }
+  return state.signalAudit;
+}
+function recordSignalScan(a,ultimateSide,deepReasons){
+  const p=state.points.at(-1);if(!p)return;
+  const log=getSignalAudit();
+  if(log.lastTs===p.ts)return;
+  log.lastTs=p.ts;log.scans++;
+  const passed=!deepReasons.length;
+  if(passed)log.deepQualified++;
+  if(ultimateSide!=='NONE')log.ultimateQualified++;
+  if(state.lastTradeTs===p.ts)log.deepOpened++;
+  if(ultimate.lastTradeTs===p.ts)log.ultimateOpened++;
+  const reasons=deepReasons.length?deepReasons:['PASS: normal Deep safety filters'];
+  for(const key of reasons){log.blocked[key]=(log.blocked[key]||0)+1}
+  log.recent.unshift({ts:p.ts,side:a.side,score:a.confidence,reasons:reasons.slice(0,4),ultimate:ultimateSide,deepOpened:state.lastTradeTs===p.ts,ultimateOpened:ultimate.lastTradeTs===p.ts});
+  log.recent=log.recent.slice(0,12);
+}
+function renderDailyAudit(){
+  const log=getSignalAudit(),latest=log.recent[0];
+  const summary=['Since this app was opened today (new source candles only): '+log.scans+' checked',
+    'Deep passed: '+log.deepQualified+' | Deep virtual entries: '+log.deepOpened,
+    'Ultimate passed: '+log.ultimateQualified+' | Ultimate virtual entries: '+log.ultimateOpened];
+  if(latest)summary.push('Last checked '+new Date(latest.ts*1000).toLocaleTimeString()+': '+latest.side+' • '+latest.score+'/100 • '+latest.reasons.join(' / '));
+  else summary.push('No new source candle checked yet; wait for a fresh candle with app open.');
+  const most=Object.entries(log.blocked).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  if(most.length)summary.push('Most common conditions: '+most.map(([k,n])=>n+'x '+k).join(' | '));
+  $('#dailyAudit').textContent=summary.join('\n');
+}
 function evaluateOnNewPoint(){
   if(!state.feedOk||isFeedStale())return;
   const a=analysis(),threshold=Math.max(60,Math.min(95,+$('#threshold').value||78));
@@ -289,6 +324,15 @@ function evaluateOnNewPoint(){
     const minGap=cooldown*(state.sourceFrame||300);
     if(!state.lastTradeTs||p.ts-state.lastTradeTs>=minGap)openTrade(a);
   }
+  const guards=[];
+  if(a.side==='NONE')guards.push('No clear direction');
+  if(a.blockReasons?.length)guards.push(...a.blockReasons);
+  if(a.confidence<threshold)guards.push('Score below '+threshold);
+  if(a.score<55)guards.push('Strength below 55');
+  if(!$('#autoMode').checked)guards.push('Auto Mode OFF');
+  if(state.active&&state.lastTradeTs!==p?.ts)guards.push('Another trade active');
+  if(p&&state.lastTradeTs&&p.ts<state.lastTradeTs+Math.max(1,+$('#cooldown').value||1)*(state.sourceFrame||300)&&state.lastTradeTs!==p.ts)guards.push('Cooldown');
+  recordSignalScan(a,ultimateSide,guards);
 }
 function openTrade(a){
   let stake=Math.max(10,+$('#stake').value||100);stake=Math.min(stake,state.balance);if(stake<10)return;
