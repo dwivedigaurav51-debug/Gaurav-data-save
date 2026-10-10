@@ -7,7 +7,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.envarg.shibotc"
+        applicationId "com.envarg.otcultimate"
         minSdk 24
         targetSdk 35
         versionCode 11
