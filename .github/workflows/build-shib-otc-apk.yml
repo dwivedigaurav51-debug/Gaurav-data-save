@@ -26,22 +26,27 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Verify Ultimate V10 assets
+      - name: Verify Ultimate V11 assets
         run: |
           grep -q 'Ultimate Virtual Trading' shib-otc-apk/app/src/main/assets/index.html
           grep -q 'function settleUltimate' shib-otc-apk/app/src/main/assets/app.js
-          grep -q 'versionName "10.0"' shib-otc-apk/app/build.gradle
+          grep -q 'versionName "11.0"' shib-otc-apk/app/build.gradle
+
+      - name: Test OTC JavaScript logic
+        run: |
+          node --check shib-otc-apk/app/src/main/assets/app.js
+          node shib-otc-apk/tests/signal-smoke.cjs
 
       - name: Build SHIB-OTC-Virtual APK
         working-directory: shib-otc-apk
         run: gradle --no-daemon assembleDebug
 
       - name: Rename APK
-        run: cp shib-otc-apk/app/build/outputs/apk/debug/app-debug.apk Envarg-OTC-Ultimate-V10.apk
+        run: cp shib-otc-apk/app/build/outputs/apk/debug/app-debug.apk Envarg-OTC-Ultimate-V11.apk
 
       - name: Upload SHIB-OTC-Virtual
         uses: actions/upload-artifact@v4
         with:
-          name: Envarg-OTC-Ultimate-V10
-          path: Envarg-OTC-Ultimate-V10.apk
+          name: Envarg-OTC-Ultimate-V11
+          path: Envarg-OTC-Ultimate-V11.apk
           retention-days: 30
