@@ -48,9 +48,8 @@ window.PaperVirtual=(()=>{
   };
   wallet.balance-=STAKE;
   wallet.trades.unshift(trade);
-  const active=wallet.trades.filter(t=>t.status==='OPEN');
-  const closed=wallet.trades.filter(t=>t.status!=='OPEN');
-  wallet.trades=active.concat(closed.slice(0,250)).sort((a,b)=>b.openedAt-a.openedAt);
+  // Keep all completed entries so lifetime WIN/LOSS totals and virtual P/L
+  // cannot silently lose older trades when the history grows.
   save();
   info.opened=true;info.status='OPEN';info.expiryAt=trade.expiresAt;info.tradeId=trade.id;
   return info;
