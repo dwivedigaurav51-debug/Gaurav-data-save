@@ -341,7 +341,7 @@ function openTrade(a){
   state.active={tradeId,side:a.side,entry:p.c,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,features:a.features,bullScore:a.bullScore,bearScore:a.bearScore,scoreGap:a.scoreGap,openedAt,expiresAt,sourceTs:p.ts};
   state.history.unshift({tradeId,signalTime:openedAt,expiryTime:expiresAt,side:a.side,entry:p.c,exit:null,stake,confidence:a.confidence,baseConfidence:a.baseConfidence,adaptiveAdjustment:a.adaptiveAdjustment,bullScore:a.bullScore,bearScore:a.bearScore,scoreGap:a.scoreGap,features:a.features,patternKey:a.features?.patternKey||'',result:'OPEN',pnl:null,learningNote:'TRADE TAKEN • waiting for official 5m expiry'});
   state.history=state.history.slice(0,200);state.lastTradeTs=p.ts;state.lastSignalTs=p.ts;save();
-  sendAlert('SHIB OTC • Virtual Trade Taken',sideText(a.side)+' • Entry '+priceText(p.c)+' • ₹'+stake+' • Expiry '+new Date(expiresAt).toLocaleTimeString());
+  sendAlert(selectedAsset+' • Virtual Trade Taken',sideText(a.side)+' • Entry '+priceText(p.c)+' • ₹'+stake+' • Expiry '+new Date(expiresAt).toLocaleTimeString());
 }
 function settleFromOfficialPoints(){
   const t=state.active;if(!t)return;
@@ -357,7 +357,7 @@ function settleFromOfficialPoints(){
     row.exit=exit;row.result=tie?'DRAW':win?'WIN':'LOSS';row.pnl=pnl;row.settledAt=exitPoint.ts*1000;row.learningNote=note;
     if(diagnostic){row.lossDiagnostic=diagnostic;row.lossCode=diagnostic.code}
   }
-  sendAlert('SHIB OTC • '+(tie?'DRAW ↔️':win?'WIN ✅':'LOSS ❌'),sideText(t.side)+' • Exit '+priceText(exit)+' • '+(pnl>=0?'+':'')+'₹'+pnl.toFixed(0));
+  sendAlert(selectedAsset+' • '+(tie?'DRAW ↔️':win?'WIN ✅':'LOSS ❌'),sideText(t.side)+' • Exit '+priceText(exit)+' • '+(pnl>=0?'+':'')+'₹'+pnl.toFixed(0));
   state.active=null;save();
 }
 
@@ -368,10 +368,10 @@ function isFeedStale(){
 }
 
 function normalizeOlymptradeRaw(raw){
-  if(raw?._bridgeError)throw new Error('Olymptrade SHIB OTC connection: '+raw._bridgeError);if(raw?.asset?.symbol && String(raw.asset.symbol).toUpperCase()!==selectedAsset)throw new Error('Wrong asset returned by feed');if(raw&&raw.ok&&Array.isArray(raw.candles))return raw;
+  if(raw?._bridgeError)throw new Error('Olymptrade '+selectedAsset+' connection: '+raw._bridgeError);if(raw?.asset?.symbol && String(raw.asset.symbol).toUpperCase()!==selectedAsset)throw new Error('Wrong asset returned by feed');if(raw&&raw.ok&&Array.isArray(raw.candles))return raw;
   const charts=Array.isArray(raw?.charts)?raw.charts:[];
   const fresh=charts.filter(c=>Array.isArray(c.candles)&&c.candles.length).sort((a,b)=>Number(b.to||0)-Number(a.to||0))[0];
-  if(!fresh)throw new Error('No SHIB OTC chart data');
+  if(!fresh)throw new Error('No '+selectedAsset+' chart data');
   return {
     ok:true,
     precision:Number(raw?.asset?.precision??4),
@@ -399,7 +399,7 @@ async function fetchOfficial(){
     }
     if(selectedAsset!==requestedAsset)return;
     const incoming=(d.candles||[]).map(x=>({ts:Number(x.ts),c:Number(x.c)})).filter(x=>Number.isFinite(x.ts)&&Number.isFinite(x.c)).sort((a,b)=>a.ts-b.ts);
-    if(!incoming.length)throw new Error('No SHIB OTC price points');if(incoming.some((p,i)=>i>0&&p.ts===incoming[i-1].ts))throw new Error('Duplicate SHIB OTC timestamps');if(incoming.some(p=>p.c<=0||p.ts<1000000000||p.ts>Math.floor(Date.now()/1000)+120))throw new Error('Invalid SHIB OTC price/timestamp');
+    if(!incoming.length)throw new Error('No '+selectedAsset+' price points');if(incoming.some((p,i)=>i>0&&p.ts===incoming[i-1].ts))throw new Error('Duplicate '+selectedAsset+' timestamps');if(incoming.some(p=>p.c<=0||p.ts<1000000000||p.ts>Math.floor(Date.now()/1000)+120))throw new Error('Invalid '+selectedAsset+' price/timestamp');
     const prevLast=state.lastSourceTs;
     state.points=incoming.slice(-400);state.price=state.points.at(-1).c;state.lastSourceTs=state.points.at(-1).ts;
     state.sourceFrame=Number(d.candle_frame||300);state.sourceTitle=d.chart_title||'1D';state.precision=Number(d.precision??4);state.lastFetchAt=Date.now();state.feedError='';
@@ -471,6 +471,7 @@ function render(){
   renderUltimate();
   $('#assetSelect').value=selectedAsset;
   const isPepe=selectedAsset==='PEPEUSD_OTC';
+  $('#appTitle').textContent=(isPepe?'PEPE':'SHIB')+' OTC Virtual Signal';
   $('#assetName').textContent=isPepe?'PEPE / OTC':'SHIB / OTC';
   $('#chartTitle').textContent=isPepe?'Olymptrade PEPE OTC • Feed validation':'Olymptrade SHIB OTC feed';
   $('#chartSub').textContent=isPepe?'PEPEUSD_OTC • awaiting verified price points':'SHIBUSD_OTC • 5-minute close points';
