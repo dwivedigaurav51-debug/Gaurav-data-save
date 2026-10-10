@@ -106,7 +106,7 @@ window.PaperVirtual=(()=>{
   wallet.armed=remaining;save();
   return updates;
  }
- function onFeed(symbol,points,observedAt=Date.now(),notify=false){
+ function onFeed(symbol,points,observedAt=Date.now()){
   if(!Array.isArray(points)||!points.length)return [];
   const last=points.at(-1);
   if(!last||!Number.isFinite(last.ts))return [];
@@ -141,15 +141,7 @@ window.PaperVirtual=(()=>{
     updates.push(t);
    }
   }
-  if(updates.length){
-   save();
-   if(notify&&window.MultiBridge?.notifyPaperResult){
-    for(const t of updates){
-      if(t.status==='WIN'||t.status==='LOSS')
-       window.MultiBridge.notifyPaperResult(t.symbol,t.status,fmt(t.pnl),time(t.exitAt));
-    }
-   }
-  }
+  if(updates.length)save(); // no WIN/LOSS notifications: user requested ONLY 100/100 entry alerts
   return updates;
  }
  function getTrade(symbol,sourceTs){
