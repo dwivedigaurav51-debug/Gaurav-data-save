@@ -35,10 +35,12 @@ const bridge={
  requestNotificationPermission(){},
  notifySignal(...args){alerts.push(args)}
 };
+const referenceNow=Math.floor(Date.now()/300000)*300000+15000;
+class TestDate extends Date { static now(){return referenceNow} constructor(...a){super(...(a.length?a:[referenceNow]))} }
 const sandbox={window:{MultiBridge:bridge},document:fakeDocument,
  localStorage:{getItem:k=>storage[k]??null,setItem:(k,v)=>{storage[k]=v}},
  setInterval:(fn,ms)=>{intervals.push({fn,ms})},
- confirm:()=>true,console,Date,Math,JSON,Number,String,Array,Set,Map,Intl};
+ confirm:()=>true,console,Date:TestDate,Math,JSON,Number,String,Array,Set,Map,Intl};
 vm.createContext(sandbox);
 vm.runInContext(paperScript,sandbox,{filename:'paper.js',timeout:5000});
 vm.runInContext(script,sandbox,{filename:'app.js',timeout:5000});
@@ -48,7 +50,7 @@ assert.equal(bridge.last.split(',').length,32,'All 32 assets scanned');
 assert.equal(query('ASSETS.length'),32);
 const javaSymbols=[...java.matchAll(/"([A-Z]{6,7}_OTC)"/g)].map(m=>m[1]);
 for(const symbol of query('ASSETS.map(a=>a.symbol)'))assert(javaSymbols.includes(symbol),'Missing native whitelist '+symbol);
-const now=Math.floor(Date.now()/300000)*300;
+const now=Math.floor(referenceNow/300000)*300;
 function validPoints(n=80,spacing=300,oldAge=0){
  return Array.from({length:n},(_,i)=>({
   ts:now-(n-1-i)*spacing-oldAge,
@@ -72,10 +74,16 @@ assert.equal(query('STATES.PEPEUSD_OTC.status'),'ERROR','HTTP failure shown');
 sandbox.window.nativeScanDone();
 assert.equal(query('inFlight'),false);
 assert.equal(query('STATES.ETHUSD_OTC.status'),'ERROR','Unanswered assets become error');
-query("addSignal(INDEX.EURUSD_OTC,{side:'UP',score:85,lastTs:STATES.EURUSD_OTC.lastTs,price:1.24})");
-query("addSignal(INDEX.EURUSD_OTC,{side:'UP',score:85,lastTs:STATES.EURUSD_OTC.lastTs,price:1.24})");
-assert.equal(alerts.length,1,'Alert de-duplicated per asset candle');
-assert.equal(query('history.length'),1,'History avoids duplicate');
+query("addSignal(INDEX.EURUSD_OTC,{side:'UP',strong:true,score:99,lastTs:STATES.EURUSD_OTC.lastTs,price:1.24})");
+assert.equal(alerts.length,0,'99/100 must never produce a notification');
+assert.equal(query('history.length'),0,'99/100 must not appear as a new signal');
+assert.equal(query('window.PaperVirtual.getWallet().trades.length'),0,'99/100 must never trade');
+query("addSignal(INDEX.EURUSD_OTC,{side:'UP',strong:true,score:100,lastTs:STATES.EURUSD_OTC.lastTs,price:1.24})");
+query("addSignal(INDEX.EURUSD_OTC,{side:'UP',strong:true,score:100,lastTs:STATES.EURUSD_OTC.lastTs,price:1.24})");
+assert.equal(alerts.length,1,'Only 100/100 entry alert, once per candle');
+assert.equal(alerts[0][2],'100','Notification must show score 100');
+assert.equal(query('history.length'),1,'100/100 signal persisted once');
+assert.equal(query('window.PaperVirtual.getWallet().trades.length'),1,'100/100 opens the virtual trade');
 assert(query("$('#assetList').innerHTML.includes('EUR/USD OTC')"));
 assert(query("$('#scanStatus').textContent.includes('Last scan complete')"));
 console.log('PASS: standalone package, 32 native symbol matches, 5m feed, stale/timeframe/symbol rejection, history/alerts and UI');
