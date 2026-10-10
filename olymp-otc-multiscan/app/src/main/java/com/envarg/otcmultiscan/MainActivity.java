@@ -110,9 +110,15 @@ public final class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public void notifySignal(String symbol, String side, String score) {
+        public void notifySignal(String symbol, String side, String score, String entryWindow, String expiryTime) {
             if (!SUPPORTED.contains(symbol) || (!"UP".equals(side) && !"DOWN".equals(side))) return;
-            runOnUiThread(() -> publishSignal(symbol, side, score));
+            runOnUiThread(() -> publishSignal(symbol, side, score, entryWindow, expiryTime));
+        }
+
+        @JavascriptInterface
+        public void notifyPaperResult(String symbol, String result, String paperPnl, String exitTime) {
+            if (!SUPPORTED.contains(symbol) || (!"WIN".equals(result) && !"LOSS".equals(result))) return;
+            runOnUiThread(() -> publishPaperResult(symbol, result, paperPnl, exitTime));
         }
     }
 
@@ -187,15 +193,29 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void publishSignal(String symbol, String side, String score) {
+    private String labelForSymbol(String symbol) {
+        String label = symbol.endsWith("_OTC") ? symbol.substring(0, symbol.length() - 4) : symbol;
+        if (label.length() == 6) label = label.substring(0, 3) + "/" + label.substring(3);
+        return label + " OTC";
+    }
+
+    private void publishSignal(String symbol, String side, String score, String entryWindow, String expiryTime) {
+        String title = labelForSymbol(symbol) + " • STRONG " + side;
+        String body = "Score " + score + "/100 (not accuracy). Entry " + entryWindow +
+                      ". Expiry " + expiryTime + " (paper quote only)";
+        pushNotification(title, body);
+    }
+
+    private void publishPaperResult(String symbol, String result, String paperPnl, String exitTime) {
+        String title = labelForSymbol(symbol) + " • VIRTUAL " + result;
+        String body = "Paper P/L " + paperPnl + " • source quote " + exitTime +
+                      " • not a real Olymptrade trade";
+        pushNotification(title, body);
+    }
+
+    private void pushNotification(String title, String body) {
         if (Build.VERSION.SDK_INT >= 33 &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
-        String label = symbol.endsWith("_OTC") ? symbol.substring(0, symbol.length() - 4) : symbol;
-        if (label.length() == 6 && !label.startsWith("PEPE")) {
-            label = label.substring(0, 3) + "/" + label.substring(3);
-        }
-        String title = label + " OTC • STRONG " + side;
-        String body = "Signal score " + score + "/100 (not predicted win rate) • 5m source candle";
         Notification.Builder b;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             b = new Notification.Builder(this, NOTIFICATION_CHANNEL);
