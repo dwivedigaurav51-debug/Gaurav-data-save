@@ -4,7 +4,7 @@
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
  <meta name="theme-color" content="#07111e">
- <title>Envarg OTC Multi Scanner · Virtual V2</title>
+ <title>Envarg OTC Multi Scanner · 100 Score Only V3</title>
  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -22,28 +22,28 @@
    <span id="scanDot" class="dot"></span>
    <div class="grow"><strong id="scanStatus">Scanner ready</strong>
     <small id="scanSub">Connecting to source…</small></div>
-   <span class="chip">PAPER SIGNALS</span>
+   <span class="chip">100/100 ONLY</span>
   </section>
 
   <section class="stats">
    <article class="stat card"><small>Assets</small><strong id="totalCount">32</strong><span>Forex + Crypto</span></article>
    <article class="stat card"><small>Fresh Feed</small><strong id="liveCount">0</strong><span>Active quotes</span></article>
-   <article class="stat card"><small>Strong Now</small><strong id="strongCount">0</strong><span>UP / DOWN</span></article>
+   <article class="stat card"><small>100/100 Now</small><strong id="strongCount">0</strong><span>UP / DOWN</span></article>
    <article class="stat card"><small>Feed Errors</small><strong id="errorCount">0</strong><span>Not guessed</span></article>
   </section>
 
   <section class="card hero">
-   <div class="sectionhead"><div><div class="eyebrow accent">LATEST MATCHES</div><h2>Strong Signals <span class="glow">●</span></h2></div>
+   <div class="sectionhead"><div><div class="eyebrow accent">ONLY PERFECT INDICATOR AGREEMENT</div><h2>100/100 Signals <span class="glow">●</span></h2></div>
     <span class="chip" id="strongBadge">0 live</span></div>
    <div id="strongSignals" class="stronglist">
     <p class="empty">पहले स्कैन का इंतजार है। सिर्फ असली ताजा कीमत मिलने पर सिग्नल दिखेगा।</p>
    </div>
-   <p class="note">Score = indicators की सहमति, 100% जीत या accuracy नहीं। गलत/पुरानी फीड पर कोई सिग्नल नहीं।</p>
+   <p id="scorePolicy" class="note">ONLY 100/100 · 99/100 या कम स्कोर पर न सिग्नल, न वर्चुअल ट्रेड, न नोटिफिकेशन। 100/100 इंडिकेटर स्कोर है, 100% accuracy नहीं।</p>
   </section>
 
   <section class="card paper">
    <div class="sectionhead">
-    <div><div class="eyebrow accent">AUTO VIRTUAL TRADING</div><h2>Strong Signal Paper Trades <span class="glow">●</span></h2></div>
+    <div><div class="eyebrow accent">100/100 AUTO VIRTUAL TRADING</div><h2>Only 100/100 Paper Trades <span class="glow">●</span></h2></div>
     <span class="chip">5m · Demo only</span>
    </div>
    <div class="paperstats">
@@ -52,16 +52,19 @@
     <article><small>LOSS</small><strong id="paperLosses" class="lose">0</strong><span>गलत दिशा</span></article>
     <article><small>Accuracy</small><strong id="paperAccuracy">—</strong><span>WIN / (WIN + LOSS)</span></article>
     <article><small>Net P/L</small><strong id="paperPnl">₹0</strong><span>Paper only</span></article>
-    <article><small>Open Trades</small><strong id="paperOpenCount">0</strong><span>अगली फीड का इंतजार</span></article>
+    <article><small>Open Trades</small><strong id="paperOpenCount">0</strong><span>expiry का इंतजार</span></article>
+    <article><small>Waiting Entry</small><strong id="paperArmedCount">0</strong><span>नई 5m कैंडल चाहिए</span></article>
    </div>
    <div class="papercontrols">
-    <label class="check"><input id="paperAuto" type="checkbox" checked> Strong Signal पर Auto Virtual Trade</label>
+    <label class="check"><input id="paperAuto" type="checkbox" checked> सिर्फ 100/100 पर Auto Virtual Trade</label>
     <div class="fixedstake"><span>Starting ₹10,000</span><span>Stake ₹200 / trade</span><span>Illustrative payout 90%</span></div>
    </div>
    <div class="divider"></div>
-   <div class="sectionhead"><h2>Active Virtual Trades</h2><span id="paperPending" class="chip">0 active</span></div>
+   <div class="sectionhead"><h2>Active Virtual Trades</h2><span id="paperPending" class="chip">0 OPEN · 0 WAITING</span></div>
    <div id="paperOpenList" class="papertrade-list"><p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p></div>
-   <p class="note">एंट्री सिर्फ ताज़ा Strong Signal मिलने पर अपने आप दर्ज होगी। BUY/SELL विंडो सिग्नल मिलने के बाद अधिकतम 60 सेकंड है; पुराने या expired quote पर ट्रेड नहीं लगेगी। Expiry एंट्री से 5 मिनट बाद है, लेकिन परिणाम अगली उपलब्ध 5m source कीमत आने पर तय होगा। वास्तविक Olymptrade का entry/exit इससे अलग हो सकता है।</p>
+   <div class="sectionhead"><h2>100/100 Signals Waiting Entry</h2></div>
+   <div id="paperArmedList" class="papertrade-list"><p class="empty">नई कैंडल का इंतजार कर रहे सिग्नल यहाँ आएँगे।</p></div>
+   <p class="note">सिर्फ 100/100 संकेत एंट्री के योग्य होंगे। अगर latest 5m कैंडल पहले ही पुरानी है तो WAITING ENTRY दिखेगा; अगली नई कैंडल मिलने पर ही वर्चुअल एंट्री खुलेगी। OPEN होने के बाद ENTRY FROM और ENTRY UNTIL (60 सेकंड), तथा 5 मिनट बाद की expiry दिखाई जाएगी। स्रोत कैंडल की कीमत लाइव खरीदी जा सकने वाली कीमत नहीं है।</p>
    <div class="divider"></div>
    <div class="sectionhead"><h2>Virtual Trade History &amp; Results</h2><button id="paperReset" class="secondary" type="button">Reset Virtual Only</button></div>
    <div id="paperTotals" class="paper-subline">0 settled · 0 draws · 0 void</div>
@@ -89,7 +92,7 @@
   </section>
 
   <details class="card history" open>
-   <summary><span><strong>Signal History</strong><small>जब भी नया Strong Signal बनता है, उसका नाम और समय सेव होता है</small></span><span class="chevron">⌄</span></summary>
+   <summary><span><strong>Signal History</strong><small>सिर्फ 100/100 पर सिग्नल हिस्ट्री बनेगी; पुराना V2 इतिहास अलग पहचाना जाएगा</small></span><span class="chevron">⌄</span></summary>
    <div id="signalHistory" class="historylist"><p class="empty">अभी कोई सिग्नल दर्ज नहीं है।</p></div>
    <button id="clearHistory" type="button" class="secondary">Clear Signal History</button>
   </details>
@@ -102,10 +105,10 @@
      <div><small>Next automatic scan</small><strong id="nextScan">—</strong></div>
      <div><small>5m candles needed</small><strong>At least 60</strong></div>
     </div>
-    <label class="check"><input id="alertToggle" type="checkbox" checked> Strong Signal पर फोन नोटिफिकेशन (ऐप खुली होने पर)</label>
+    <label class="check"><input id="alertToggle" type="checkbox" checked> सिर्फ 100/100 की Virtual Entry पर नोटिफिकेशन (ऐप खुली होने पर)</label>
     <p class="note">यह स्वतंत्र ऐप है, Olymptrade की आधिकारिक ऐप नहीं। एक सार्वजनिक वेबसाइट एंडपॉइंट से मिले डेटा का Olymptrade ट्रेडिंग टर्मिनल से मिलान सत्यापित नहीं है। डेटा न मिले तो Feed Error दिखेगा। ऐप बंद होने पर स्कैन/नोटिफिकेशन नहीं चलेंगे।</p>
   </section>
-  <footer>Envarg OTC Multi Scanner v2.0 · Virtual Trades · No login · Paper signals only · Not investment advice</footer>
+  <footer>Envarg OTC Multi Scanner v3.0 · 100/100 only · No login · Paper signals only · Not investment advice</footer>
  </main>
  <script src="paper.js"></script>
  <script src="app.js"></script>
