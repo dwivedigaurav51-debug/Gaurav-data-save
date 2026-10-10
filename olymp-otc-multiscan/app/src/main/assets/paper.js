@@ -4,12 +4,14 @@
 window.PaperVirtual=(()=>{
  const KEY='envargOtcMultiPaperV2';
  const INITIAL=10000,STAKE=200,PAYOUT=.90,DURATION=300000,ENTRY_WINDOW=60000,MAX_QUOTE_AGE=120000,SETTLEMENT_GRACE=300000;
+ const SIGNAL_MAX_AGE=420000,ARM_TIMEOUT=900000,REQUIRED_SCORE=100;
  const $=s=>document.querySelector(s);
  const getSaved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}};
- const fallback=()=>({version:2,initial:INITIAL,balance:INITIAL,auto:true,trades:[],skipped:[]});
+ const fallback=()=>({version:2,initial:INITIAL,balance:INITIAL,auto:true,trades:[],skipped:[],armed:[]});
  let wallet=getSaved();
  if(!wallet||wallet.version!==2||!Array.isArray(wallet.trades)||!Number.isFinite(wallet.balance))wallet=fallback();
  wallet.skipped=Array.isArray(wallet.skipped)?wallet.skipped:[];
+ wallet.armed=Array.isArray(wallet.armed)?wallet.armed:[];
  wallet.auto=wallet.auto!==false;
  const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(wallet))}catch(_){}};
  const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -26,33 +28,83 @@ window.PaperVirtual=(()=>{
   wallet.skipped.unshift({symbol:asset.symbol,name:asset.name,reason,time:now});
   wallet.skipped=wallet.skipped.slice(0,40);save();
  }
- function onStrong(asset,st,detectedAt=Date.now()){
-  const sourceMs=Number(st.lastTs)*1000;
-  const age=detectedAt-sourceMs;
-  const allowedUntil=Math.min(detectedAt+ENTRY_WINDOW,sourceMs+MAX_QUOTE_AGE);
-  const info={entryFrom:detectedAt,entryUntil:allowedUntil,expiryAt:null,opened:false,status:'SKIPPED',reason:''};
-  const fail=(reason)=>{info.reason=reason;skip(asset,reason,detectedAt);return info};
+ function openPaper(asset,signal,lastQuote,detectedAt){
+  const sourceMs=Number(lastQuote.ts)*1000;
+  const quoteAge=detectedAt-sourceMs;
+  const info={entryFrom:detectedAt,entryUntil:detectedAt+ENTRY_WINDOW,expiryAt:null,opened:false,status:'SKIPPED',reason:'',tradeId:null};
+  const fail=reason=>{info.reason=reason;skip(asset,reason,detectedAt);return info};
   if(!wallet.auto)return fail('AUTO PAPER OFF');
-  if(!Number.isFinite(st.price)||st.price<=0||!Number.isFinite(sourceMs)||sourceMs<=0)return fail('INVALID PRICE / TIMESTAMP');
-  if(age< -10000)return fail('FUTURE SOURCE CANDLE');
-  if(age>=MAX_QUOTE_AGE||allowedUntil<=detectedAt)return fail('ENTRY CLOSED: quote older than 2 minutes');
+  if(Number(signal.score)!==REQUIRED_SCORE)return fail('ONLY 100/100 SCORE');
+  if(signal.side!=='UP'&&signal.side!=='DOWN')return fail('INVALID DIRECTION');
+  if(!Number.isFinite(lastQuote.c)||lastQuote.c<=0||!Number.isFinite(sourceMs)||sourceMs<=0)return fail('INVALID SOURCE PRICE');
+  if(quoteAge< -10000||quoteAge>=SIGNAL_MAX_AGE)return fail('QUOTE NOT FRESH ENOUGH TO OBSERVE');
   if(wallet.trades.some(t=>t.status==='OPEN'&&t.symbol===asset.symbol))return fail('ACTIVE TRADE on same currency');
   if(wallet.balance<STAKE)return fail('VIRTUAL BALANCE BELOW ₹200');
-  const id=asset.symbol+':'+String(st.lastTs);
-  if(wallet.trades.some(t=>t.id===id))return fail('ALREADY TRADED THIS SOURCE CANDLE');
+  const signalTs=Number(signal.lastTs),id=asset.symbol+':100:'+signalTs;
+  if(wallet.trades.some(t=>t.id===id))return fail('100/100 SIGNAL ALREADY TRADED');
   const trade={
-   id,symbol:asset.symbol,name:asset.name,side:st.side,score:st.score,
-   stake:STAKE,payout:PAYOUT,entryPrice:st.price,sourceTs:st.lastTs,
-   entryFrom:detectedAt,entryUntil:allowedUntil,openedAt:detectedAt,expiresAt:detectedAt+DURATION,
-   status:'OPEN',exitPrice:null,exitAt:null,settledAt:null,pnl:null,diagnostic:''
+   id,symbol:asset.symbol,name:asset.name,side:signal.side,score:REQUIRED_SCORE,
+   stake:STAKE,payout:PAYOUT,entryPrice:lastQuote.c,sourceTs:lastQuote.ts,signalSourceTs:signalTs,
+   entryFrom:detectedAt,entryUntil:detectedAt+ENTRY_WINDOW,openedAt:detectedAt,expiresAt:detectedAt+DURATION,
+   status:'OPEN',exitPrice:null,exitAt:null,settledAt:null,pnl:null,diagnostic:'',entryNote:'Simulated at detected-time using last observed source candle close (not executable live quote)'
   };
   wallet.balance-=STAKE;
   wallet.trades.unshift(trade);
-  // Keep all completed entries so lifetime WIN/LOSS totals and virtual P/L
-  // cannot silently lose older trades when the history grows.
-  save();
-  info.opened=true;info.status='OPEN';info.expiryAt=trade.expiresAt;info.tradeId=trade.id;
+  save();info.opened=true;info.status='OPEN';info.expiryAt=trade.expiresAt;info.tradeId=id;
   return info;
+ }
+ function onStrong(asset,st,detectedAt=Date.now()){
+  const sourceMs=Number(st.lastTs)*1000,age=detectedAt-sourceMs;
+  const info={entryFrom:null,entryUntil:null,expiryAt:null,opened:false,status:'SKIPPED',reason:'',tradeId:null};
+  const fail=reason=>{info.reason=reason;skip(asset,reason,detectedAt);return info};
+  if(Number(st.score)!==REQUIRED_SCORE)return fail('ONLY 100/100 SCORE');
+  if(st.side!=='UP'&&st.side!=='DOWN')return fail('INVALID DIRECTION');
+  if(!wallet.auto)return fail('AUTO PAPER OFF');
+  if(!Number.isFinite(st.price)||st.price<=0||!Number.isFinite(sourceMs)||sourceMs<=0)return fail('INVALID PRICE/TIME');
+  if(age< -10000||age>=SIGNAL_MAX_AGE)return fail('EXPIRED 100/100 SOURCE CANDLE');
+  if(wallet.trades.some(t=>t.status==='OPEN'&&t.symbol===asset.symbol))return fail('ACTIVE TRADE on same currency');
+  if(wallet.armed.some(t=>t.symbol===asset.symbol&&t.sourceTs===st.lastTs))return fail('ALREADY WAITING FOR FRESH ENTRY');
+  if(wallet.trades.some(t=>t.symbol===asset.symbol&&t.signalSourceTs===st.lastTs))return fail('ALREADY TRADED 100/100 SIGNAL');
+  if(wallet.balance<STAKE)return fail('VIRTUAL BALANCE BELOW ₹200');
+  if(age<MAX_QUOTE_AGE){
+   return openPaper(asset,st,{ts:st.lastTs,c:st.price},detectedAt);
+  }
+  // Many 5-minute sources return the most recently *closed* candle. Its
+  // timestamp can already be 5+ minutes old. Queue the signal rather than
+  // silently skipping it or pretending a trade happened in the past.
+  const pending={symbol:asset.symbol,name:asset.name,side:st.side,score:REQUIRED_SCORE,
+    sourceTs:Number(st.lastTs),referencePrice:st.price,armedAt:detectedAt,timeoutAt:detectedAt+ARM_TIMEOUT};
+  wallet.armed.push(pending);save();
+  return {...info,status:'WAITING_ENTRY',reason:'100/100 CONFIRMED: waiting for a NEW 5-minute source candle',
+    entryFrom:null,entryUntil:null};
+ }
+ function onQuote(symbol,points,observedAt=Date.now(),notify=false){
+  if(!Array.isArray(points)||!points.length)return [];
+  const latest=points.at(-1);
+  if(!latest||!Number.isFinite(latest.ts)||!Number.isFinite(latest.c)||latest.c<=0)return [];
+  const updates=[],remaining=[];
+  for(const queued of wallet.armed){
+   if(queued.symbol!==symbol){remaining.push(queued);continue}
+   if(observedAt>queued.timeoutAt){
+    skip({symbol:queued.symbol,name:queued.name},'100/100 WAITING ENTRY TIMED OUT',observedAt);
+    continue;
+   }
+   if(latest.ts<=queued.sourceTs){remaining.push(queued);continue}
+   const asset={symbol:queued.symbol,name:queued.name};
+   const result=openPaper(asset,{side:queued.side,score:REQUIRED_SCORE,lastTs:queued.sourceTs},
+      {ts:latest.ts,c:latest.c},observedAt);
+   if(result.opened){
+     updates.push({...result,symbol:queued.symbol,side:queued.side,score:REQUIRED_SCORE});
+     if(notify&&window.MultiBridge?.notifySignal){
+       const period=time(result.entryFrom)+' - '+time(result.entryUntil);
+       window.MultiBridge.notifySignal(queued.symbol,queued.side,'100',period,time(result.expiryAt));
+     }
+   }else if(result.reason==='QUOTE NOT FRESH ENOUGH TO OBSERVE'){
+     remaining.push(queued); // retry if the source recovers before timeout
+   }
+  }
+  wallet.armed=remaining;save();
+  return updates;
  }
  function onFeed(symbol,points,observedAt=Date.now(),notify=false){
   if(!Array.isArray(points)||!points.length)return [];
@@ -101,7 +153,7 @@ window.PaperVirtual=(()=>{
   return updates;
  }
  function getTrade(symbol,sourceTs){
-  return wallet.trades.find(t=>t.symbol===symbol&&t.sourceTs===sourceTs)||null;
+  return wallet.trades.find(t=>t.symbol===symbol&&(t.signalSourceTs??t.sourceTs)===sourceTs)||null;
  }
  function totals(){
   const all=wallet.trades;
@@ -110,8 +162,9 @@ window.PaperVirtual=(()=>{
   const draws=all.filter(t=>t.status==='DRAW').length;
   const voids=all.filter(t=>t.status==='VOID').length;
   const open=all.filter(t=>t.status==='OPEN').length;
+  const armed=wallet.armed.length;
   const pnl=all.filter(t=>Number.isFinite(t.pnl)).reduce((sum,t)=>sum+t.pnl,0);
-  return {wins,losses,draws,voids,open,pnl,accuracy:wins+losses?wins/(wins+losses)*100:null};
+  return {wins,losses,draws,voids,open,armed,pnl,accuracy:wins+losses?wins/(wins+losses)*100:null};
  }
  function tradeCard(t,isOpen){
   const status=safe(t.status),p=t.pnl;
@@ -134,7 +187,12 @@ window.PaperVirtual=(()=>{
  }
  function renderOpen(){
   const open=wallet.trades.filter(t=>t.status==='OPEN');
-  $('#paperPending').textContent=open.length+' active';
+  $('#paperPending').textContent=open.length+' OPEN · '+wallet.armed.length+' WAITING';
+  $('#paperArmedList').innerHTML=wallet.armed.length?wallet.armed.map(q=>
+   '<div class="papertrade"><div class="head"><strong>'+safe(q.name)+' · '+safe(q.side)+' · 100/100</strong><span class="pill">WAITING ENTRY</span></div>'+ 
+   '<div class="timerline">100/100 confirmed. Waiting next fresh 5m candle.</div>'+ 
+   '<div class="sub">Signal candle '+safe(time(q.sourceTs*1000))+' · Armed '+safe(time(q.armedAt))+' · timeout '+safe(time(q.timeoutAt))+'</div></div>'
+  ).join(''):'<p class="empty">अभी कोई 100/100 सिग्नल एंट्री का इंतजार नहीं कर रहा।</p>';
   $('#paperOpenList').innerHTML=open.length
    ?open.map(t=>tradeCard(t,true)).join('')
    :'<p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p>';
@@ -148,8 +206,9 @@ window.PaperVirtual=(()=>{
   $('#paperPnl').textContent=(t.pnl>0?'+':'')+fmt(t.pnl);
   $('#paperPnl').className=t.pnl>0?'win':t.pnl<0?'lose':'';
   $('#paperOpenCount').textContent=t.open;
+  $('#paperArmedCount').textContent=t.armed;
   $('#paperAuto').checked=!!wallet.auto;
-  $('#paperTotals').textContent=(t.wins+t.losses)+' completed W/L · '+t.draws+' DRAW · '+t.voids+' VOID · '+t.open+' OPEN';
+  $('#paperTotals').textContent=(t.wins+t.losses)+' completed W/L · '+t.draws+' DRAW · '+t.voids+' VOID · '+t.open+' OPEN · '+t.armed+' WAITING ENTRY';
   renderOpen();
   const closed=wallet.trades.filter(t=>t.status!=='OPEN');
   $('#paperHistory').innerHTML=closed.length
@@ -177,9 +236,9 @@ window.PaperVirtual=(()=>{
    wallet.auto=$('#paperAuto').checked;save();render();
  });
  $('#paperReset').addEventListener('click',()=>{
-   if(openCount()){alert('Active paper trade का रिजल्ट आने तक virtual wallet reset नहीं कर सकते।');return}
+   if(openCount()||wallet.armed.length){alert('Open या WAITING ENTRY paper signal पहले पूरा होने दो।');return}
    if(!confirm('Reset ONLY Multi Scanner virtual balance, trade history and accuracy to ₹10,000?'))return;
    wallet=fallback();save();render();
  });
- return {onStrong,onFeed,getTrade,totals,render,renderOpen,getWallet:()=>wallet};
+ return {onStrong,onQuote,onFeed,getTrade,totals,render,renderOpen,getWallet:()=>wallet};
 })();
