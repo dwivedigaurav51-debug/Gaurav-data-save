@@ -10,9 +10,10 @@ const ASSETS = [
 ];
 const INDEX = Object.fromEntries(ASSETS.map(a=>[a.symbol,a]));
 const STATES = Object.fromEntries(ASSETS.map(a=>[a.symbol,{status:'WAITING',lastTs:0,price:null,score:0,side:'NONE',strong:false,error:'',reason:'Scan not run',dataCount:0,frame:0,checkedAt:0}]));
-const POLL_INTERVAL=300000; // approximately one five-minute source candle
+const POLL_INTERVAL=300000; // one five-minute source candle
+const SCAN_OFFSET=12000; // aim for shortly after each 5-minute source boundary
 const ALERT_FRESHNESS=420000; // never alert on an old candle
-let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastCycle=0,activeTab='all',scanDoneCount=0,seenResults=new Set();
+let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),activeTab='all',scanDoneCount=0,seenResults=new Set();
 let history=readStore('envargMultiSignalHistoryV1',[]);
 let seen=readStore('envargMultiSignalSeenV1',{});
 let notifications=readStore('envargMultiNotificationsV1',true);
@@ -294,7 +295,8 @@ function updateUI(){
  $('#scanDot').className='dot '+(inFlight?'':scanDoneCount&&$('#liveCount').textContent!=='0'?'good':scanDoneCount?'bad':'');
  $('#lastScan').textContent=prettyTime(startedAt);
  $('#completedScan').textContent=prettyTime(completedAt);
- $('#nextScan').textContent=startedAt?prettyTime(startedAt+POLL_INTERVAL):'—';
+ const nextCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL)+1;
+ $('#nextScan').textContent=prettyTime(nextCycle*POLL_INTERVAL+SCAN_OFFSET);
  PAPER.render();
 }
 $('#search').addEventListener('input',updateUI);
@@ -318,6 +320,12 @@ $('#alertToggle').addEventListener('change',()=>{
 if(notifications&&window.MultiBridge?.requestNotificationPermission)window.MultiBridge.requestNotificationPermission();
 updateUI();
 startScan();
-setInterval(()=>{if(!inFlight&&Date.now()-lastStart>=POLL_INTERVAL)startScan()},15000);
+setInterval(()=>{
+ const now=Date.now(),cycle=Math.floor((now-SCAN_OFFSET)/POLL_INTERVAL);
+ if(cycle>lastCycle&&!inFlight){
+   lastCycle=cycle;
+   if(now-lastStart>=120000)startScan(); // don't spam broker source
+ }
+},5000);
 setInterval(updateUI,30000);
 setInterval(()=>PAPER.renderOpen(),1000);
