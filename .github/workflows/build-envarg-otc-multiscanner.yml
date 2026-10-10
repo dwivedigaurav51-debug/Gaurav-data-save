@@ -1,0 +1,58 @@
+name: Envarg OTC Multi Scanner
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'olymp-otc-multiscan/**'
+      - '.github/workflows/build-envarg-otc-multiscanner.yml'
+
+jobs:
+  build:
+    name: Build Independent OTC Multi Scanner APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate multi-asset logic
+        run: |
+          node --check olymp-otc-multiscan/app/src/main/assets/app.js
+          node olymp-otc-multiscan/tests/scanner.test.cjs
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build independent debug APK
+        working-directory: olymp-otc-multiscan
+        run: gradle --no-daemon assembleDebug
+
+      - name: Verify APK contains independent package and scanner
+        run: |
+          cp olymp-otc-multiscan/app/build/outputs/apk/debug/app-debug.apk Envarg-OTC-Multi-Scanner-V1.apk
+          unzip -l Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'assets/index.html'
+          unzip -l Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'assets/app.js'
+          unzip -l Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'classes.dex'
+          unzip -p Envarg-OTC-Multi-Scanner-V1.apk assets/app.js | grep -q 'nativeAssetResult'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging Envarg-OTC-Multi-Scanner-V1.apk | grep -q 'com.envarg.otcmultiscan'
+          ls -lh Envarg-OTC-Multi-Scanner-V1.apk
+
+      - name: Upload independent multi-OTC APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Envarg-OTC-Multi-Scanner-V1
+          path: Envarg-OTC-Multi-Scanner-V1.apk
+          retention-days: 30
