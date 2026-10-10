@@ -246,7 +246,7 @@ function updateUI(){
   const buyText=trade
    ?'PAPER ENTRY '+prettyTime(trade.entryFrom)+' – '+prettyTime(trade.entryUntil)+' · EXP '+prettyTime(exp)
    :h
-    ?(h.paperStatus==='WAITING_ENTRY'?'100/100 · WAITING NEXT VERIFIED 5m CANDLE':h.paperStatus==='SKIPPED'?'NO PAPER ENTRY: '+(h.paperReason||'Not eligible'):h.entryUntil>Date.now()?'ENTRY WINDOW '+prettyTime(openAt)+' – '+prettyTime(until):'ENTRY WINDOW CLOSED / NO PAPER TRADE')
+    ?(h.paperStatus==='WAITING_ENTRY'?(PAPER.isQueued(s.asset.symbol,s.lastTs)?'100/100 · WAITING NEXT VERIFIED 5m CANDLE':'100/100 · WAIT EXPIRED / NO ENTRY'):h.paperStatus==='SKIPPED'?'NO PAPER ENTRY: '+(h.paperReason||'Not eligible'):h.entryUntil>Date.now()?'ENTRY WINDOW '+prettyTime(openAt)+' – '+prettyTime(until):'ENTRY WINDOW CLOSED / NO PAPER TRADE')
     :'Checking entry timing…';
   return '<div class="signalrow '+(s.side==='DOWN'?'down':'')+'"><div><span class="assetname">'+esc(s.asset.name)+'</span>'+
   '<span class="meta">Latest price '+esc(fmtPrice(s.price))+' · candle '+esc(prettyTime(s.lastTs*1000))+'</span>'+
@@ -282,7 +282,7 @@ function updateUI(){
   const trade=PAPER.getTrade(row.symbol,row.candleTs);
   const timing=trade
     ?'ENTRY '+prettyTime(trade.entryFrom)+'–'+prettyTime(trade.entryUntil)+' · EXP '+prettyTime(trade.expiresAt)+' · '+trade.status
-    :row.paperStatus==='WAITING_ENTRY'?'100/100 QUEUED · next fresh candle needed'
+    :row.paperStatus==='WAITING_ENTRY'?(PAPER.isQueued(row.symbol,row.candleTs)?'100/100 QUEUED · next fresh candle needed':'100/100 WAIT EXPIRED · no paper entry')
     :row.entryFrom?(row.paperReason||'ENTRY WINDOW CLOSED')+' · Signal '+prettyTime(row.entryFrom)
      :'Legacy pre-100/100 signal (no new trade)';
   return '<div class="historyrow"><div><strong>'+esc(row.name)+'</strong> · '+esc(prettyTime(row.detected))+
