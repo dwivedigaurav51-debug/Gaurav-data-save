@@ -70,6 +70,29 @@ function adaptiveAdjustment(features){
   return {adjustment,evidence};
 }
 
+// A high/low close-based stochastic reading alone does not prove a reversal.
+// Block extremes only alongside other risk evidence. The older absolute
+// stochastic veto discarded trending momentum candles even with aligned EMA/MACD.
+function entrySafetyBlocks(side,f,px,upper,lower){
+  if(!f||side==='NONE')return [];
+  const reasons=[];
+  if(side==='UP'){
+    if(f.emaTrend==='bear')reasons.push('UP: bearish EMA trend');
+    if(f.macd!=='pos')reasons.push('UP: MACD is negative');
+    if(f.R>=65)reasons.push('UP: RSI '+f.R.toFixed(1)+' >=65');
+    if(f.st>=80&&(f.R>=60||f.emaTrend!=='bull'))reasons.push('UP: high stochastic '+f.st.toFixed(1)+' plus weak/extended confirmation');
+    if(px>=upper)reasons.push('UP: price at/above upper Bollinger band');
+  }else{
+    if(f.emaTrend==='bull')reasons.push('DOWN: bullish EMA trend');
+    if(f.macd!=='neg')reasons.push('DOWN: MACD is positive');
+    if(f.R<=35)reasons.push('DOWN: RSI '+f.R.toFixed(1)+' <=35');
+    if(f.st<=20&&(f.R<=40||f.emaTrend!=='bear'))reasons.push('DOWN: low stochastic '+f.st.toFixed(1)+' plus weak/extended confirmation');
+    if(px<=lower)reasons.push('DOWN: price at/below lower Bollinger band');
+  }
+  if(f.volPct>=.7)reasons.push('Volatility '+f.volPct.toFixed(3)+'% >=0.7%');
+  return reasons;
+}
+
 function analysis(){
   const closes=state.points.map(x=>x.c),ts=(state.points.at(-1)?.ts||0)*1000;
   if(closes.length<55)return {score:50,side:'NONE',baseConfidence:50,confidence:50,adaptiveAdjustment:0,reason:'Waiting for 55 official SHIB OTC data points…',features:null};
@@ -92,13 +115,14 @@ function analysis(){
   const features=makeFeatures({side,R,hist,px,mid,upper,lower,st,volPct,slope,e9,e21,e50,ts});
   const adapt=adaptiveAdjustment(features),confidence=Math.round(Math.max(45,Math.min(97,baseConfidence+adapt.adjustment)));
   // Conservative safety filter based on recorded loss patterns. These rules require forward testing.
-  const exhaustionBlocked=(side==='UP'&&(st>=80||R>=65||hist<=0||volPct>=.7||px>=upper))||(side==='DOWN'&&(st<=20||R<=35||hist>=0||volPct>=.7||px<=lower));
+  const blockReasons=entrySafetyBlocks(side,features,px,upper,lower);
+  const exhaustionBlocked=blockReasons.length>0;
   $('#emaState').textContent=features.emaTrend==='bull'?'Bullish':features.emaTrend==='bear'?'Bearish':'Mixed';
   $('#rsiState').textContent=R.toFixed(1);$('#macdState').textContent=hist>0?'Positive':'Negative';
   $('#bbState').textContent=px>upper?'Above upper':px<lower?'Below lower':px>mid?'Upper half':'Lower half';
   $('#stochState').textContent=st.toFixed(1);$('#atrState').textContent=volPct.toFixed(3)+'%';
   $('#regime').textContent=features.regime.toUpperCase();
-  return {score:raw,side,baseConfidence,confidence,adaptiveAdjustment:adapt.adjustment,reason:reasons.join(' • ')+' • '+adapt.evidence,features,bullScore:bull,bearScore:bear,scoreGap:Math.abs(bull-bear),exhaustionBlocked};
+  return {score:raw,side,baseConfidence,confidence,adaptiveAdjustment:adapt.adjustment,reason:reasons.join(' • ')+' • '+adapt.evidence,features,bullScore:bull,bearScore:bear,scoreGap:Math.abs(bull-bear),exhaustionBlocked,blockReasons};
 }
 
 function updateBucket(obj,key,win){if(!key)return;const s=obj[key]||(obj[key]={n:0,w:0,l:0,last:[]});s.n++;if(win)s.w++;else s.l++;s.last.unshift(win?1:0);s.last=s.last.slice(0,20)}
