@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="hi">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <meta name="theme-color" content="#07111e">
+ <title>Envarg OTC Multi Scanner</title>
+ <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+ <main class="shell">
+  <header class="top">
+   <div class="brandline"><div class="logo">E<span>↗</span></div>
+    <div><div class="eyebrow">ENVARG CIRCUITS · OTC WATCH</div>
+    <h1>OTC Multi <em>Scanner</em></h1>
+    <div class="subtitle">Olymptrade OTC assets · 5-minute source-candle analysis</div></div>
+   </div>
+   <button id="scanBtn" class="primary" type="button">↻ Scan Now</button>
+  </header>
+
+  <section class="statusbar card" aria-live="polite">
+   <span id="scanDot" class="dot"></span>
+   <div class="grow"><strong id="scanStatus">Scanner ready</strong>
+    <small id="scanSub">Connecting to source…</small></div>
+   <span class="chip">PAPER SIGNALS</span>
+  </section>
+
+  <section class="stats">
+   <article class="stat card"><small>Assets</small><strong id="totalCount">32</strong><span>Forex + Crypto</span></article>
+   <article class="stat card"><small>Fresh Feed</small><strong id="liveCount">0</strong><span>Active quotes</span></article>
+   <article class="stat card"><small>Strong Now</small><strong id="strongCount">0</strong><span>UP / DOWN</span></article>
+   <article class="stat card"><small>Feed Errors</small><strong id="errorCount">0</strong><span>Not guessed</span></article>
+  </section>
+
+  <section class="card hero">
+   <div class="sectionhead"><div><div class="eyebrow accent">LATEST MATCHES</div><h2>Strong Signals <span class="glow">●</span></h2></div>
+    <span class="chip" id="strongBadge">0 live</span></div>
+   <div id="strongSignals" class="stronglist">
+    <p class="empty">पहले स्कैन का इंतजार है। सिर्फ असली ताजा कीमत मिलने पर सिग्नल दिखेगा।</p>
+   </div>
+   <p class="note">Score = indicators की सहमति, 100% जीत या accuracy नहीं। गलत/पुरानी फीड पर कोई सिग्नल नहीं।</p>
+  </section>
+
+  <section class="card watch">
+   <div class="sectionhead"><div><div class="eyebrow">LIVE WATCHLIST</div><h2>OTC Currencies &amp; Crypto</h2></div>
+     <span class="chip">32 assets</span></div>
+   <div class="tabs" role="group" aria-label="Asset categories">
+    <button class="tab selected" data-tab="all">सभी</button>
+    <button class="tab" data-tab="forex">Forex</button>
+    <button class="tab" data-tab="crypto">Crypto</button>
+    <button class="tab" data-tab="strong">Strong</button>
+    <button class="tab" data-tab="error">Feed Error</button>
+   </div>
+   <input id="search" class="search" type="search" placeholder="Currency खोजो: EUR/USD, PEPE, BTC…" autocomplete="off">
+   <div id="assetList" class="assetlist"></div>
+  </section>
+
+  <details class="card history" open>
+   <summary><span><strong>Signal History</strong><small>जब भी नया Strong Signal बनता है, उसका नाम और समय सेव होता है</small></span><span class="chevron">⌄</span></summary>
+   <div id="signalHistory" class="historylist"><p class="empty">अभी कोई सिग्नल दर्ज नहीं है।</p></div>
+   <button id="clearHistory" type="button" class="secondary">Clear Signal History</button>
+  </details>
+
+  <section class="card help">
+    <h2>Data Health &amp; Alerts</h2>
+    <div class="helpgrid">
+     <div><small>Last scan started</small><strong id="lastScan">—</strong></div>
+     <div><small>Last scan completed</small><strong id="completedScan">—</strong></div>
+     <div><small>Next automatic scan</small><strong id="nextScan">—</strong></div>
+     <div><small>5m candles needed</small><strong>At least 60</strong></div>
+    </div>
+    <label class="check"><input id="alertToggle" type="checkbox" checked> Strong Signal पर फोन नोटिफिकेशन (ऐप खुली होने पर)</label>
+    <p class="note">यह स्वतंत्र ऐप है, Olymptrade की आधिकारिक ऐप नहीं। एक सार्वजनिक वेबसाइट एंडपॉइंट से मिले डेटा का Olymptrade ट्रेडिंग टर्मिनल से मिलान सत्यापित नहीं है। डेटा न मिले तो Feed Error दिखेगा। ऐप बंद होने पर स्कैन/नोटिफिकेशन नहीं चलेंगे।</p>
+  </section>
+  <footer>Envarg OTC Multi Scanner v1.0 · No login · Paper signals only · Not investment advice</footer>
+ </main>
+ <script src="app.js"></script>
+</body>
+</html>
