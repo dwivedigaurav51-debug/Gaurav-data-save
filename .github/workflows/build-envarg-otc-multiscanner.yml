@@ -62,10 +62,11 @@ jobs:
           grep -q 'WAITING ENTRY' /tmp/paper-trades-check.js
           grep -q 'REQUIRED_SCORE=100' /tmp/multi-scanner-check.js
           grep -q 'versionName "4.0"' olymp-otc-multiscan/app/build.gradle
-          grep -q 'applicationId "com.envarg.otcmultiscan"' olymp-otc-multiscan/app/build.gradle
+          grep -q 'applicationId "com.envarg.otcmultiscan.v4"' olymp-otc-multiscan/app/build.gradle
+          grep -q 'android:label="Envarg OTC Multi V4"' olymp-otc-multiscan/app/src/main/AndroidManifest.xml
           AAPT="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
           if [ -n "$AAPT" ]; then
-            "$AAPT" dump badging Envarg-OTC-Multi-Scanner-V4.apk | grep 'com.envarg.otcmultiscan'
+            "$AAPT" dump badging Envarg-OTC-Multi-Scanner-V4.apk | grep 'com.envarg.otcmultiscan.v4'
           fi
           ls -lh Envarg-OTC-Multi-Scanner-V4.apk
 
