@@ -2,10 +2,10 @@
 
 This is a completely independent, paper-signal-only Android application.
 
-- **Package ID:** `com.envarg.otcmultiscan.v4`
-- **Launcher name:** Envarg OTC Multi V4
-- **Version:** 4.0
-- **Independent of older apps:** `com.envarg.shibotc`, `com.envarg.otcultimate`, **and old Multi Scanner V3** (`com.envarg.otcmultiscan`). All three previous apps, their balances and saved history remain on the phone.
+- **Package ID:** `com.envarg.otcmultiscan.v5`
+- **Launcher name:** Envarg OTC Multi V5
+- **Version:** 5.0
+- **Independent of older apps:** `com.envarg.shibotc`, `com.envarg.otcultimate`, **and old Multi Scanner V3** (`com.envarg.otcmultiscan`) and V4 (`com.envarg.otcmultiscan.v4`). The previous apps, their balances and local saved histories remain untouched.
 - **32 watchlist entries:** 25 OTC forex pairs + 7 crypto OTC names.
 - **Asset-specific Strong UP/DOWN** candidates, 5m candle history, source status, score (indicator agreement, **not** win probability), ticker name, price, local candle time and de-duplicated local alert history.
 - **Native parallel scan:** 4 worker threads, source checked about every 5 minutes **while app is open**, with two-minute manual refresh cooldown.
@@ -17,13 +17,23 @@ This is a completely independent, paper-signal-only Android application.
 
 GitHub Actions: [Build Envarg OTC Multi Scanner](https://github.com/dwivedigaurav51-debug/Gaurav-data-save/actions/workflows/build-envarg-otc-multiscanner.yml).
 
-Open the newest **green successful** workflow run and download **Artifacts → Envarg-OTC-Multi-Scanner-V4**, extract the ZIP and install `Envarg-OTC-Multi-Scanner-V4.apk`. Do not use an older SHIB OTC artifact.
+Open the newest **green successful** workflow run and download **Artifacts → Envarg-OTC-Multi-Scanner-V5**, extract the ZIP and install `Envarg-OTC-Multi-Scanner-V5.apk`. Do not use an older SHIB OTC artifact.
 
 The workflow runs Node.js quote-validation tests and Gradle assembleDebug, and checks the APK contents. If the build is red, inspect its job logs instead of treating a previous APK as the new build. This README does not attest to a successful build.
 
+## V5: settlement recovery for stuck OPEN paper trades
+
+- Fixes the case where e.g. 7 paper positions remain **OPEN**, the stake has been deducted, but no WIN/LOSS updates because the expiry's five-minute source quote never arrives or the OTC endpoint errors.
+- A successfully verified exit point at or just after the virtual expiry is still used for genuine paper **WIN / LOSS**. No fabricated outcomes are generated from old prices, merely elapsed time, or 100/100 heuristic scores.
+- If **20 minutes after virtual expiry** no appropriate candle has arrived, the trade becomes **VOID**, and the full ₹200 paper stake is refunded automatically. VOID is excluded from WIN/LOSS accuracy. Refund is idempotent and saved.
+- After restarting the app, historical source responses get the chance to repair expired trades before auto-VOID: wait for a source attempt, or 150 seconds. Open-trade cards display the last source candle, feed error, countdown and refund deadline. Settlement Health shows expired/open counts and recent refunded trades.
+- Test simulation: seven old stuck trades and balance ₹8,600 → seven VOID, balance ₹10,000 (0 false wins, 0 false losses). A trade with verified expiry candle still settled as WIN in regression testing.
+- V5 has **different Android application ID** `com.envarg.otcmultiscan.v5` because GitHub Actions debug APKs may not share signing certificates across builds. Original V4 can remain installed, **but V4's stored 7 stuck entries cannot be read or repaired inside the new V5 app** because Android isolates app data. Do not uninstall V4 if you need its existing history. V5 has a fresh independent demo wallet.
+- Automatic scanner/settlement checks work while the app is running. Actual Olymptrade terminal price equivalence remains unverified.
+
 ## V4: compact UI, high-count demo trading, and honest in-progress results
 
-- **Separate safe installation:** V4 has Android package `com.envarg.otcmultiscan.v4` and installs **alongside** original Multi Scanner V3. The V3 app and its existing 3 WIN/2 LOSS history remain in V3. Because the Android app storage is isolated, **V4 starts its own new virtual wallet and does not automatically import V3 trades**. This avoids the risk of losing old data due to per-run debug APK signature differences.
+- **Separate safe installation:** V4 has Android package `com.envarg.otcmultiscan.v4` and installs **alongside** original Multi Scanner V3. V5 is also a separately installed app. The V3 app and its existing 3 WIN/2 LOSS history remain in V3. Because the Android app storage is isolated, **V4 starts its own new virtual wallet and does not automatically import V3 trades**. This avoids the risk of losing old data due to per-run debug APK signature differences.
 - There is **no fixed five-trade or 100-trade limit**. Every qualifying 100/100 signal can start a new independent virtual trade, subject to the source, no duplicate signal, and one active trade per asset.
 - A **Demo Auto Top-up** option (default enabled) credits **₹10,000 virtual-only** when the wallet has less than the ₹200 stake. Top-ups are logged separately; they are **never counted in paper P/L, WIN/LOSS or accuracy**. Switch it off in the app to keep the original balance constraint.
 - V4 trade count, lifetime W/L statistics and entire V4 saved ledger remain available in V4 device storage; older entries are shown through **50-trade pagination** after the newest 25. Device storage is finite, so very large histories remain subject to storage capacity. The app displays a warning if saving fails.
