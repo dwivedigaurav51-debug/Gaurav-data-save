@@ -4,7 +4,7 @@
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
  <meta name="theme-color" content="#07111e">
- <title>Envarg OTC Multi Scanner · V4 Unlimited Demo</title>
+ <title>Envarg OTC Multi Scanner · V5 Settlement Repair</title>
  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -56,6 +56,12 @@
     <article><small>Waiting Entry</small><strong id="paperArmedCount">0</strong><span>नई 5m कैंडल चाहिए</span></article>
     <article><small>Total Virtual Trades</small><strong id="paperTotalTrades">0</strong><span>100+ · no fixed count limit</span></article>
     <article><small>Demo Top-ups</small><strong id="paperRefillTotal">₹0</strong><span>P/L में नहीं गिने जाएँगे</span></article>
+   </div>
+   <div id="paperVoidNotice" class="save-warning" role="status"></div>
+   <div class="paper-health" aria-live="polite">
+     <strong>Settlement Health</strong>
+     <span id="paperSettlementHealth">Waiting for trade expiry data…</span>
+     <small>5m source की पुष्टि के बाद WIN/LOSS। एक्सपायरी के 20 मिनट बाद भी सही डेटा नहीं मिला तो VOID और पूरा ₹200 रिफंड।</small>
    </div>
    <div class="papercontrols">
     <div class="paper-toggles"><label class="check"><input id="paperAuto" type="checkbox" checked> सिर्फ 100/100 पर Auto Virtual Trade</label>
@@ -132,7 +138,7 @@
     <button id="paperResultDismiss" type="button" class="primary">History में सेव · Next Signal</button>
    </div>
   </div>
-  <footer>Envarg OTC Multi Scanner v4.0 · 100/100 only · No login · Paper signals only · Not investment advice</footer>
+  <footer>Envarg OTC Multi Scanner v5.0 · 100/100 only · No login · Paper signals only · Not investment advice</footer>
  </main>
  <script src="paper.js"></script>
  <script src="app.js"></script>
