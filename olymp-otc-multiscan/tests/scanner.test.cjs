@@ -92,5 +92,5 @@ assert.equal(alerts[0].length,5,'Signal notification includes entry window and e
 assert.equal(query('history.length'),1,'100/100 signal persisted once');
 assert.equal(query('window.PaperVirtual.getWallet().trades.length'),1,'100/100 opens the virtual trade');
 assert(query("$('#assetList').innerHTML.includes('EUR/USD OTC')"));
-assert(query("$('#scanStatus').textContent.includes('Last scan complete')"));
+assert(query("$('#scanStatus').textContent.includes('Full scan complete')"));
 console.log('PASS: standalone package, 32 native symbol matches, 5m feed, stale/timeframe/symbol rejection, history/alerts and UI');
