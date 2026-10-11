@@ -8,6 +8,10 @@ import android.app.NotificationManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.provider.Settings;
+import android.text.TextUtils;
+import android.accessibilityservice.AccessibilityServiceInfo;
+import android.view.accessibility.AccessibilityManager;
 import android.widget.Toast;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -110,6 +114,27 @@ public final class MainActivity extends Activity {
                 String label = labelForSymbol(symbol);
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("OTC signal currency", label));
+                boolean enabled = false;
+                AccessibilityManager manager = (AccessibilityManager) getSystemService(Context.ACCESSIBILITY_SERVICE);
+                if (manager != null) {
+                    for (AccessibilityServiceInfo info : manager.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)) {
+                        if (info.getResolveInfo() != null &&
+                            getPackageName().equals(info.getResolveInfo().serviceInfo.packageName) &&
+                            OlympSearchService.class.getName().equals(info.getResolveInfo().serviceInfo.name)) enabled = true;
+                    }
+                }
+                if (enabled) {
+                    getSharedPreferences(OlympSearchService.PREF, MODE_PRIVATE).edit()
+                        .putString(OlympSearchService.KEY, label)
+                        .putLong(OlympSearchService.TIME, System.currentTimeMillis()).apply();
+                } else {
+                    new android.app.AlertDialog.Builder(MainActivity.this)
+                        .setTitle("Olymptrade Search Assist")
+                        .setMessage("Assets → Search में करेंसी भरने के लिए Accessibility अनुमति चाहिए। यह केवल सर्च तक सीमित है, कोई ट्रेड नहीं लगाता। Settings में Envarg OTC Multi की सेवा चालू करें।")
+                        .setPositiveButton("Accessibility Settings", (d, w) ->
+                            startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)))
+                        .setNegativeButton("बाद में", null).show();
+                }
                 Intent launch = getPackageManager().getLaunchIntentForPackage("com.ticno.olymptrade");
                 if (launch == null) {
                     Toast.makeText(MainActivity.this, "Olymptrade ऐप नहीं मिली। करेंसी कॉपी: " + label, Toast.LENGTH_LONG).show();
@@ -117,7 +142,7 @@ public final class MainActivity extends Activity {
                 }
                 try {
                     startActivity(launch);
-                    Toast.makeText(MainActivity.this, label + " कॉपी है। Olymptrade में यही करेंसी चुनें।", Toast.LENGTH_LONG).show();
+                    Toast.makeText(MainActivity.this, label + (enabled ? " — Search Assist शुरू" : " कॉपी है। सर्च में Paste करें।"), Toast.LENGTH_LONG).show();
                 } catch (Exception ex) {
                     Toast.makeText(MainActivity.this, "Olymptrade नहीं खुल सकी। करेंसी कॉपी: " + label, Toast.LENGTH_LONG).show();
                 }
