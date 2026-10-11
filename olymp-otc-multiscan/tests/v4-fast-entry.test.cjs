@@ -47,6 +47,7 @@ run("STATES.GBPUSD_OTC.status='LIVE'");
 const candle=Math.floor(clock.now/300000)*300-300;
 run("addSignal(INDEX.EURUSD_OTC,{strong:true,side:'UP',score:100,price:1.12,lastTs:"+candle+"})");
 run("PAPER.renderOpen()");
+run('updateUI()');
 assert(el('#paperEntryStatus').textContent.includes('WAITING'),'Signal must show as waiting immediately');
 assert.equal(run('PAPER.getWallet().armed.length'),1,'Closed-candle 100/100 signal gets queued');
 assert.equal(run('PAPER.getWallet().trades.length'),0,'Do not pretend queued signal was actually traded');
