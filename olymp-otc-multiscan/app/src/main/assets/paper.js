@@ -222,18 +222,23 @@ window.PaperVirtual=(()=>{
   const cls=t.status==='WIN'?'wintrade':t.status==='LOSS'?'losstrade':t.status==='VOID'?'voidtrade':'';
   const pill=t.status==='WIN'?'winpill':t.status==='LOSS'?'losspill':'';
   const remaining=t.expiresAt-Date.now();
-  const sub=isOpen?(remaining>0?'Trade in progress · source-only preview':'Expiry reached — verifying next source close'):
+  const expiryPending=isOpen&&remaining<=0;
+  const sub=isOpen?(remaining>0?'Trade in progress · source-only preview':'EXPIRY REACHED · FINAL RESULT PENDING · waiting for a validated 5m source close'):
        (t.exitAt?'Settled source '+time(t.exitAt):'No matching expiry quote');
   const expiryClock=isOpen?'<div class="countdown-large '+(remaining<=0?'expired':'')+'"><span><small>Expiry Countdown</small><small style="display:block;margin-top:5px">Target '+safe(time(t.expiresAt))+'</small></span><strong>'+safe(countdown(remaining))+'</strong></div>':'';
   const freshPreview=isOpen&&t.previewAt&&Date.now()-t.previewAt<=720000;
   const livePreview=isOpen
    ?'<div class="live-trade-preview"><div class="current">'+
-     (freshPreview
-      ?'<span class="'+(t.previewStatus==='WIN'?'win':t.previewStatus==='LOSS'?'lose':'flat')+'">INDICATIVE '+safe(t.previewStatus)+' · 5m SOURCE</span>'
-      :'<span class="flat">WAITING FOR NEW 5m PRICE</span>')+
-     '</div><div class="detail">'+(freshPreview
-       ?'Source '+safe(time(t.previewAt))+' · latest observed price '+safe(price(t.previewPrice))+' · NOT FINAL until expiry'
-       :'5-minute quote has not updated since entry. Do not infer WIN / LOSS.')+
+     (expiryPending
+       ?'<span class="flat">00:00 · RESULT PENDING (NOT WIN / LOSS YET)</span>'
+       :freshPreview
+        ?'<span class="'+(t.previewStatus==='WIN'?'win':t.previewStatus==='LOSS'?'lose':'flat')+'">INDICATIVE '+safe(t.previewStatus)+' · 5m SOURCE</span>'
+        :'<span class="flat">WAITING FOR NEW 5m PRICE</span>')+
+     '</div><div class="detail">'+(expiryPending
+       ?'The countdown has finished. A result is not available until valid expiry-source data arrives.'
+       :freshPreview
+        ?'Source '+safe(time(t.previewAt))+' · latest observed price '+safe(price(t.previewPrice))+' · NOT FINAL until expiry'
+        :'5-minute quote has not updated since entry. Do not infer WIN / LOSS.')+
      '</div></div>'
    :'';
   return '<div class="papertrade '+cls+'"><div class="head"><strong>'+safe(t.name)+' · '+safe(t.side)+' '+(t.side==='UP'?'↑':'↓')+'</strong><span class="pill '+pill+'">'+status+(p!==null?' · '+safe(fmt(p)):'')+'</span></div>'+
