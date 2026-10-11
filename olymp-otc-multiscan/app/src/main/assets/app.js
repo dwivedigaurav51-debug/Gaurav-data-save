@@ -10,11 +10,17 @@ const ASSETS = [
 ];
 const INDEX = Object.fromEntries(ASSETS.map(a=>[a.symbol,a]));
 const STATES = Object.fromEntries(ASSETS.map(a=>[a.symbol,{status:'WAITING',lastTs:0,price:null,score:0,side:'NONE',strong:false,error:'',reason:'Scan not run',dataCount:0,frame:0,checkedAt:0}]));
-const POLL_INTERVAL=300000; // one five-minute source candle
+const POLL_INTERVAL=300000; // full 32-asset scan on each five-minute boundary
+const PRIORITY_INTERVAL=60000; // extra lightweight check only for waiting/open trade symbols
+const PRIORITY_LIMIT=8; // cap requests per rapid scan to reduce source rate limits
+const PRIORITY_MIN_GAP=15000; // avoid duplicate immediate requests
 const SCAN_OFFSET=12000; // aim for shortly after each 5-minute source boundary
 const ALERT_FRESHNESS=420000; // 5m last-close quotes may reach us one cycle late
 const REQUIRED_SCORE=100; // strict indicator agreement, NOT a predicted win rate
-let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),activeTab='all',scanDoneCount=0,seenResults=new Set();
+let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastFullScan=0,lastPriorityScan=0,
+    activeScanSymbols=[],activeScanKind='full',priorityCursor=0,
+    lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),
+    activeTab='all',scanDoneCount=0,seenResults=new Set();
 let history=readStore('envargMultiSignalHistoryV3_100only',[]);
 let seen=readStore('envargMultiSignalSeenV3_100only',{});
 let notifications=readStore('envargMultiNotificationsV1',true);
@@ -185,35 +191,66 @@ window.nativeAssetError=function(symbol,error){
 window.nativeScanDone=function(){
  if(!inFlight)return;
  inFlight=false;completedAt=Date.now();scanDoneCount++;
- for(const a of ASSETS){
-  if(!seenResults.has(a.symbol)&&STATES[a.symbol].status==='CHECKING'){
-   Object.assign(STATES[a.symbol],{status:'ERROR',strong:false,score:0,side:'NONE',error:'Scan timed out',checkedAt:Date.now()});
+ // An accelerated check touches only the selected currencies; do not mark
+ // the other 32-market watchlist entries as FEED ERROR.
+ for(const symbol of activeScanSymbols){
+  if(!seenResults.has(symbol)&&STATES[symbol]?.status==='CHECKING'){
+   Object.assign(STATES[symbol],{status:'ERROR',strong:false,score:0,side:'NONE',error:'Source scan timed out',checkedAt:Date.now()});
   }
  }
+ activeScanSymbols=[];
  updateUI();
 };
-function startScan(manual=false){
- const now=Date.now();
- if(inFlight)return;
- if(manual&&lastStart&&now-lastStart<120000){
-  $('#scanSub').textContent='Manual refresh cooldown: wait '+Math.ceil((120000-(now-lastStart))/1000)+' seconds';
-  return;
+function focusSymbols(){
+ const wallet=PAPER.getWallet();
+ const waiting=(wallet.armed||[]).map(t=>t.symbol);
+ const open=(wallet.trades||[]).filter(t=>t.status==='OPEN').map(t=>t.symbol);
+ const recent=history.filter(h=>Date.now()-h.detected<900000).map(h=>h.symbol);
+ const all=[...new Set([...waiting,...open,...recent].filter(x=>INDEX[x]))];
+ if(all.length<=PRIORITY_LIMIT)return all;
+ const selected=Array.from({length:PRIORITY_LIMIT},(_,i)=>all[(priorityCursor+i)%all.length]);
+ priorityCursor=(priorityCursor+PRIORITY_LIMIT)%all.length;
+ return selected;
+}
+function startScan(manual=false,focus=null){
+ const now=Date.now(),isFocus=Array.isArray(focus);
+ if(inFlight)return false;
+ if(isFocus&&focus.length===0)return false;
+ const gap=isFocus?PRIORITY_MIN_GAP:120000;
+ const previous=isFocus?lastPriorityScan:lastFullScan;
+ if(previous&&now-previous<gap){
+  if(manual)$('#scanSub').textContent='Please wait '+Math.ceil((gap-(now-previous))/1000)+'s to avoid duplicate source requests';
+  return false;
  }
  if(!window.MultiBridge?.scanAssets){
   $('#scanStatus').textContent='Android data bridge unavailable';
   $('#scanSub').textContent='Install the Android APK; browser preview cannot read OTC source data.';
-  $('#scanDot').className='dot bad';return;
+  $('#scanDot').className='dot bad';return false;
  }
- lastStart=now;startedAt=now;inFlight=true;seenResults=new Set();
- for(const a of ASSETS){STATES[a.symbol].status='CHECKING';STATES[a.symbol].error='';STATES[a.symbol].strong=false}
+ const selected=isFocus?[...new Set(focus.filter(x=>INDEX[x]))].slice(0,PRIORITY_LIMIT):ASSETS.map(a=>a.symbol);
+ if(!selected.length)return false;
+ if(isFocus)lastPriorityScan=now;else lastFullScan=now;
+ lastStart=now;startedAt=now;inFlight=true;activeScanKind=isFocus?'priority':'full';
+ activeScanSymbols=selected;seenResults=new Set();
+ for(const symbol of selected){STATES[symbol].status='CHECKING';STATES[symbol].error='';STATES[symbol].strong=false}
  updateUI();
- try{window.MultiBridge.scanAssets(ASSETS.map(a=>a.symbol).join(','))}
+ try{window.MultiBridge.scanAssets(selected.join(','))}
  catch(ex){
-  inFlight=false;
+  inFlight=false;activeScanSymbols=[];
   $('#scanSub').textContent='Native scan launch error: '+String(ex.message||ex);
-  for(const a of ASSETS)Object.assign(STATES[a.symbol],{status:'ERROR',error:'Scan launch failed'});
+  for(const symbol of selected)Object.assign(STATES[symbol],{status:'ERROR',error:'Scan launch failed'});
   updateUI();
+  return false;
  }
+ return true;
+}
+function checkPendingNow(manual=false){
+ const selected=focusSymbols();
+ if(!selected.length){
+  if(manual)$('#scanSub').textContent='No waiting or open paper positions to check yet';
+  return false;
+ }
+ return startScan(manual,selected);
 }
 function cardStatus(s){
  if(s.status==='LIVE')return s.strong?'STRONG '+s.side:'FEED OK';
@@ -291,12 +328,14 @@ function updateUI(){
   '<small>'+esc(timing)+'</small></div>'+
   '<div><div class="side '+(row.side==='DOWN'?'down':'')+'">'+esc(row.side)+'</div><div class="score">'+Number(row.score||0)+'/100</div></div></div>';
  }).join(''):'<p class="empty">अभी कोई Strong Signal दर्ज नहीं है।</p>';
- const checked=ASSETS.filter(a=>seenResults.has(a.symbol)).length;
+ const checked=activeScanSymbols.length?activeScanSymbols.filter(x=>seenResults.has(x)).length:seenResults.size;
+ const scanTotal=activeScanSymbols.length||ASSETS.length;
  $('#scanBtn').disabled=inFlight;
  $('#scanBtn').textContent=inFlight?'Scanning…':'↻ Scan Now';
- $('#scanStatus').textContent=inFlight?'Scanning '+checked+'/'+ASSETS.length+' OTC assets':
+ $('#paperQuickBtn').disabled=inFlight||!focusSymbols().length;
+ $('#scanStatus').textContent=inFlight?(activeScanKind==='priority'?'Fast paper check ':'Scanning ')+checked+'/'+scanTotal+' OTC assets':
    (scanDoneCount?'Last scan complete · '+checked+'/'+ASSETS.length:'Scanner ready');
- $('#scanSub').textContent=inFlight?'Checking 5-minute candles independently • 4 workers':
+ $('#scanSub').textContent=inFlight?(activeScanKind==='priority'?'Only currencies with 100/100 waiting/open paper entries':'Checking all 32 OTC 5-minute candles • 4 workers'):
    (scanDoneCount?'Every 5 minutes while the app is open':'Tap Scan Now or wait for auto scan');
  $('#scanDot').className='dot '+(inFlight?'':scanDoneCount&&$('#liveCount').textContent!=='0'?'good':scanDoneCount?'bad':'');
  $('#lastScan').textContent=prettyTime(startedAt);
@@ -312,6 +351,7 @@ document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener(
  updateUI();
 }));
 $('#scanBtn').addEventListener('click',()=>startScan(true));
+$('#paperQuickBtn').addEventListener('click',()=>checkPendingNow(true));
 $('#clearHistory').addEventListener('click',()=>{
  if(confirm('Clear Multi Scanner signal history only?')){
   history=[];writeStore('envargMultiSignalHistoryV3_100only',history);updateUI();
@@ -330,8 +370,12 @@ setInterval(()=>{
  const now=Date.now(),cycle=Math.floor((now-SCAN_OFFSET)/POLL_INTERVAL);
  if(cycle>lastCycle&&!inFlight){
    lastCycle=cycle;
-   if(now-lastStart>=120000)startScan(); // don't spam broker source
+   if(now-lastFullScan>=120000)startScan(); // separate full-scan clock from priority checks
  }
 },5000);
+setInterval(()=>{
+ if(inFlight)return;
+ if(Date.now()-lastPriorityScan>=PRIORITY_INTERVAL)checkPendingNow();
+},10000);
 setInterval(updateUI,30000);
 setInterval(()=>PAPER.renderOpen(),1000);
