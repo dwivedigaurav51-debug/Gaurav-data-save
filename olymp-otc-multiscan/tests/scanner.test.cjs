@@ -12,8 +12,8 @@ const gradle=fs.readFileSync(path.join(base,'app/build.gradle'),'utf8');
 const uiIds=new Set([...html.matchAll(/id="([^"]+)"/g)].map(m=>m[1]));
 const selectors=[...script.matchAll(/\$\(['"]#([^'"]+)['"]\)/g),...paperScript.matchAll(/\$\(['"]#([^'"]+)['"]\)/g)].map(m=>m[1]);
 for(const id of selectors)assert(uiIds.has(id),'Missing HTML element '+id);
-assert(gradle.includes('applicationId "com.envarg.otcmultiscan.v4"'));
-assert(manifest.includes('Envarg OTC Multi V4'));
+assert(gradle.includes('applicationId "com.envarg.otcmultiscan.v5"'));
+assert(manifest.includes('Envarg OTC Multi V5'));
 assert(manifest.includes('com.envarg.otcmultiscan.MainActivity'))
 assert(script.includes('EURUSD_OTC')||script.includes("EURUSD'"));
 assert(java.includes('PEPEUSD_OTC')&&java.includes('DOGUSD_OTC'));
