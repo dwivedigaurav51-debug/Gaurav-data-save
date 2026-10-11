@@ -172,6 +172,7 @@ window.nativeAssetResult=function(symbol,rawText){
     side:result.side||'NONE',strong:qualified,error:'',reason:result.valid&&!qualified&&result.strong?'Score '+result.score+'/100 (only 100/100 accepted)':result.reason,dataCount:points.length,frame:300,checkedAt:now});
   if(qualified&&age<=ALERT_FRESHNESS)addSignal(INDEX[symbol],old);
  }catch(ex){
+  PAPER.reportFeedError(symbol,ex.message||ex,now);
   Object.assign(old,{status:'ERROR',strong:false,side:'NONE',score:0,checkedAt:now,error:String(ex.message||ex).slice(0,160),reason:'Unable to validate feed'});
  }
  updateUI();
@@ -179,6 +180,7 @@ window.nativeAssetResult=function(symbol,rawText){
 window.nativeAssetError=function(symbol,error){
  if(!inFlight||!INDEX[symbol]||seenResults.has(symbol))return;
  seenResults.add(symbol);
+ PAPER.reportFeedError(symbol,error);
  Object.assign(STATES[symbol],{status:'ERROR',strong:false,side:'NONE',score:0,error:String(error).slice(0,160),checkedAt:Date.now(),reason:'Source request failed'});
  updateUI();
 };
@@ -187,6 +189,7 @@ window.nativeScanDone=function(){
  inFlight=false;completedAt=Date.now();scanDoneCount++;
  for(const a of ASSETS){
   if(!seenResults.has(a.symbol)&&STATES[a.symbol].status==='CHECKING'){
+   PAPER.reportFeedError(a.symbol,'Scan timed out');
    Object.assign(STATES[a.symbol],{status:'ERROR',strong:false,score:0,side:'NONE',error:'Scan timed out',checkedAt:Date.now()});
   }
  }
@@ -211,7 +214,7 @@ function startScan(manual=false){
  catch(ex){
   inFlight=false;
   $('#scanSub').textContent='Native scan launch error: '+String(ex.message||ex);
-  for(const a of ASSETS)Object.assign(STATES[a.symbol],{status:'ERROR',error:'Scan launch failed'});
+  for(const a of ASSETS){PAPER.reportFeedError(a.symbol,'Scan launch failed');Object.assign(STATES[a.symbol],{status:'ERROR',error:'Scan launch failed'})}
   updateUI();
  }
 }
