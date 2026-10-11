@@ -332,6 +332,15 @@ window.PaperVirtual=(()=>{
   $('#paperPnl').className=t.pnl>0?'win':t.pnl<0?'lose':'';
   $('#paperOpenCount').textContent=t.open;
   $('#paperVoidNotice').textContent=lastRecovery.count?'Last repair: '+lastRecovery.count+' stalled paper trade(s) VOID / refunded · '+time(lastRecovery.at):'';
+  const now=Date.now();
+  const overdue=wallet.trades.filter(t=>t.status==='OPEN'&&t.expiresAt<=now);
+  const awaitingData=overdue.filter(t=>!t.lastFeedAttemptAt||now-t.lastFeedAttemptAt>720000);
+  const nextDeadline=overdue.length?Math.min(...overdue.map(t=>t.expiresAt+MAX_SETTLEMENT_WAIT)):0;
+  $('#paperSettlementHealth').textContent=overdue.length
+    ?overdue.length+' expired paper trade(s) waiting for verified source. '+(awaitingData.length?awaitingData.length+' source unavailable/stale. ':'')+
+      (nextDeadline>now?'Next automatic VOID/refund after '+time(nextDeadline):'Refund check in progress')
+    :t.open+' open · '+t.armed+' waiting entry · '+t.voids+' VOID / refunded';
+
   $('#paperArmedCount').textContent=t.armed;
   $('#paperTotalTrades').textContent=t.trades.toLocaleString('en-IN');
   $('#paperRefillTotal').textContent=fmt(wallet.refillTotal);
