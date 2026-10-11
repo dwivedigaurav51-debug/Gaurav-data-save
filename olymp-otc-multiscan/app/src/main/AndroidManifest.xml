@@ -9,6 +9,16 @@
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:allowBackup="true"
         android:usesCleartextTraffic="false">
+        <service android:name=".OlympSearchService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:label="Envarg Olymptrade Search Assist">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                android:resource="@xml/olymp_search_accessibility" />
+        </service>
         <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
