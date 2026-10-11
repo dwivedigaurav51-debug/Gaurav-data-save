@@ -4,7 +4,7 @@
  <meta charset="utf-8">
  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
  <meta name="theme-color" content="#07111e">
- <title>Envarg OTC Multi Scanner · 100 Score Only V3</title>
+ <title>Envarg OTC Multi Scanner · V4 Unlimited Demo</title>
  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -54,32 +54,43 @@
     <article><small>Net P/L</small><strong id="paperPnl">₹0</strong><span>Paper only</span></article>
     <article><small>Open Trades</small><strong id="paperOpenCount">0</strong><span>expiry का इंतजार</span></article>
     <article><small>Waiting Entry</small><strong id="paperArmedCount">0</strong><span>नई 5m कैंडल चाहिए</span></article>
+    <article><small>Total Virtual Trades</small><strong id="paperTotalTrades">0</strong><span>100+ · no fixed count limit</span></article>
+    <article><small>Demo Top-ups</small><strong id="paperRefillTotal">₹0</strong><span>P/L में नहीं गिने जाएँगे</span></article>
    </div>
    <div class="papercontrols">
-    <label class="check"><input id="paperAuto" type="checkbox" checked> सिर्फ 100/100 पर Auto Virtual Trade</label>
+    <div class="paper-toggles"><label class="check"><input id="paperAuto" type="checkbox" checked> सिर्फ 100/100 पर Auto Virtual Trade</label>
+    <label class="check"><input id="paperRefill" type="checkbox" checked> Demo Balance खत्म होने पर ₹10,000 ऑटो रिफिल</label></div>
     <div class="fixedstake"><span>Starting ₹10,000</span><span>Stake ₹200 / trade</span><span>Illustrative payout 90%</span></div>
    </div>
    <div class="divider"></div>
    <div class="sectionhead"><h2>Active Virtual Trades</h2><span id="paperPending" class="chip">0 OPEN · 0 WAITING</span></div>
-   <div id="paperOpenList" class="papertrade-list"><p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p></div>
+   <div id="paperOpenList" class="papertrade-list active-scroll"><p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p></div>
    <div class="sectionhead"><h2>100/100 Signals Waiting Entry</h2></div>
    <div id="paperArmedList" class="papertrade-list"><p class="empty">नई कैंडल का इंतजार कर रहे सिग्नल यहाँ आएँगे।</p></div>
    <p class="note">सिर्फ 100/100 संकेत एंट्री के योग्य होंगे। अगर latest 5m कैंडल पहले ही पुरानी है तो WAITING ENTRY दिखेगा; अगली नई कैंडल मिलने पर ही वर्चुअल एंट्री खुलेगी। OPEN होने के बाद ENTRY FROM और ENTRY UNTIL (60 सेकंड), तथा 5 मिनट बाद की expiry दिखाई जाएगी। स्रोत कैंडल की कीमत लाइव खरीदी जा सकने वाली कीमत नहीं है।</p>
    <div class="divider"></div>
-   <div class="sectionhead"><h2>Virtual Trade History &amp; Results</h2><button id="paperReset" class="secondary" type="button">Reset Virtual Only</button></div>
-   <div id="paperTotals" class="paper-subline">0 settled · 0 draws · 0 void</div>
-   <div id="paperHistory" class="papertrade-list"><p class="empty">पहली Strong Signal ट्रेड का इंतजार है।</p></div>
-   <details class="paperdetails">
-    <summary>Currency-wise WIN / LOSS Report</summary>
-    <div id="paperByAsset" class="asset-report"><p class="empty">अभी कोई ट्रेड डेटा नहीं।</p></div>
+   <details id="paperHistoryDetails" class="foldbox">
+    <summary><span><strong>📜 Virtual Trade History</strong><small id="paperHistoryCount">0 completed trades · Tap to check history</small></span><span class="chevron">⌄</span></summary>
+    <div class="foldbody">
+     <div class="sectionhead"><h2>WIN / LOSS / DRAW / VOID</h2><button id="paperReset" class="secondary" type="button">Reset Virtual Only</button></div>
+     <div id="paperTotals" class="paper-subline">0 settled · 0 draws · 0 void</div>
+     <div id="paperHistory" class="papertrade-list compact-scroll"><p class="empty">पहली Strong Signal ट्रेड का इंतजार है।</p></div>
+     <button id="paperHistoryMore" class="secondary" type="button" hidden>Show older trades (next 50)</button>
+     <details class="paperdetails">
+      <summary>Currency-wise WIN / LOSS Report</summary>
+      <div id="paperByAsset" class="asset-report"><p class="empty">अभी कोई ट्रेड डेटा नहीं।</p></div>
+     </details>
+     <div id="paperSkipped" class="paper-subline">0 outdated / unavailable entries skipped</div>
+    </div>
    </details>
-   <div id="paperSkipped" class="paper-subline">0 outdated / unavailable entries skipped</div>
    <p class="note">WIN / LOSS सिर्फ 5-minute source quotes पर आधारित अनुमानित virtual परिणाम हैं, असली पैसा या प्रमाणित Olymptrade payout नहीं। फीड न मिले तो PENDING या VOID दिखेगा, नकली WIN / LOSS नहीं।</p>
   </section>
 
-  <section class="card watch">
-   <div class="sectionhead"><div><div class="eyebrow">LIVE WATCHLIST</div><h2>OTC Currencies &amp; Crypto</h2></div>
-     <span class="chip">32 assets</span></div>
+  <details id="currencyDetails" class="card watch foldbox">
+   <summary><span><strong>💱 OTC Currency Watchlist</strong><small>32 Forex &amp; Crypto assets · Tap to show list</small></span><span class="chevron">⌄</span></summary>
+   <div class="foldbody">
+    <div class="sectionhead"><div><div class="eyebrow">LIVE WATCHLIST</div><h2>OTC Currencies &amp; Crypto</h2></div>
+      <span class="chip">32 assets</span></div>
    <div class="tabs" role="group" aria-label="Asset categories">
     <button class="tab selected" data-tab="all">सभी</button>
     <button class="tab" data-tab="forex">Forex</button>
@@ -88,10 +99,11 @@
     <button class="tab" data-tab="error">Feed Error</button>
    </div>
    <input id="search" class="search" type="search" placeholder="Currency खोजो: EUR/USD, PEPE, BTC…" autocomplete="off">
-   <div id="assetList" class="assetlist"></div>
-  </section>
+   <div id="assetList" class="assetlist compact-scroll"></div>
+   </div>
+  </details>
 
-  <details class="card history" open>
+  <details class="card history foldbox">
    <summary><span><strong>Signal History</strong><small>सिर्फ 100/100 पर सिग्नल हिस्ट्री बनेगी; पुराना V2 इतिहास अलग पहचाना जाएगा</small></span><span class="chevron">⌄</span></summary>
    <div id="signalHistory" class="historylist"><p class="empty">अभी कोई सिग्नल दर्ज नहीं है।</p></div>
    <button id="clearHistory" type="button" class="secondary">Clear Signal History</button>
@@ -108,7 +120,18 @@
     <label class="check"><input id="alertToggle" type="checkbox" checked> सिर्फ 100/100 की Virtual Entry पर नोटिफिकेशन (ऐप खुली होने पर)</label>
     <p class="note">यह स्वतंत्र ऐप है, Olymptrade की आधिकारिक ऐप नहीं। एक सार्वजनिक वेबसाइट एंडपॉइंट से मिले डेटा का Olymptrade ट्रेडिंग टर्मिनल से मिलान सत्यापित नहीं है। डेटा न मिले तो Feed Error दिखेगा। ऐप बंद होने पर स्कैन/नोटिफिकेशन नहीं चलेंगे।</p>
   </section>
-  <footer>Envarg OTC Multi Scanner v3.0 · 100/100 only · No login · Paper signals only · Not investment advice</footer>
+  <div id="paperResultOverlay" class="result-overlay" hidden role="dialog" aria-modal="true" aria-labelledby="paperResultBig">
+   <div class="result-modal" id="paperResultCard">
+    <div class="result-overline">VIRTUAL TRADE COMPLETED • FINAL SOURCE RESULT</div>
+    <div id="paperResultBig" class="result-big">WIN</div>
+    <div id="paperResultSymbol" class="result-symbol">—</div>
+    <div id="paperResultProfit" class="result-profit">—</div>
+    <div id="paperResultPrices" class="result-prices">—</div>
+    <div class="result-note">5m source simulation · Not guaranteed Olymptrade execution</div>
+    <button id="paperResultDismiss" type="button" class="primary">History में सेव · Next Signal</button>
+   </div>
+  </div>
+  <footer>Envarg OTC Multi Scanner v4.0 · 100/100 only · No login · Paper signals only · Not investment advice</footer>
  </main>
  <script src="paper.js"></script>
  <script src="app.js"></script>
