@@ -6,6 +6,8 @@ window.PaperVirtual=(()=>{
  const INITIAL=10000,STAKE=200,PAYOUT=.90,DURATION=300000,ENTRY_WINDOW=60000,MAX_QUOTE_AGE=120000,SETTLEMENT_GRACE=300000;
  const SIGNAL_MAX_AGE=420000,ARM_TIMEOUT=900000,REQUIRED_SCORE=100;
  const MAX_SETTLEMENT_WAIT=1200000; // 20 min after expiry; never invent WIN/LOSS
+ const BOOT_RECOVERY_WAIT=150000; // try to fetch expiry history on launch before voiding old positions
+ const sessionStarted=Date.now();
  const $=s=>document.querySelector(s);
  const getSaved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}};
  const fallback=()=>({version:3,initial:INITIAL,balance:INITIAL,auto:true,autoRefill:true,refillTotal:0,topups:[],trades:[],skipped:[],armed:[]});
@@ -59,6 +61,7 @@ window.PaperVirtual=(()=>{
   const timedOut=[];
   for(const trade of wallet.trades){
    if(trade.status!=='OPEN'||!Number.isFinite(trade.expiresAt)||now<trade.expiresAt+MAX_SETTLEMENT_WAIT)continue;
+   if(!(trade.lastFeedAttemptAt>=sessionStarted)&&now-sessionStarted<BOOT_RECOVERY_WAIT)continue;
    // No broker expiry quote means neither a verified WIN nor a verified LOSS.
    trade.status='VOID';
    trade.pnl=0;
