@@ -2,10 +2,10 @@
 
 This is a completely independent, paper-signal-only Android application.
 
-- **Package ID:** `com.envarg.otcmultiscan`
-- **Launcher name:** Envarg OTC Multi Scanner
+- **Package ID:** `com.envarg.otcmultiscan.v4`
+- **Launcher name:** Envarg OTC Multi V4
 - **Version:** 4.0
-- **Independent of older apps:** `com.envarg.shibotc`, `com.envarg.otcultimate`. Their APKs, application storage, balances and saved trade histories are not touched.
+- **Independent of older apps:** `com.envarg.shibotc`, `com.envarg.otcultimate`, **and old Multi Scanner V3** (`com.envarg.otcmultiscan`). All three previous apps, their balances and saved history remain on the phone.
 - **32 watchlist entries:** 25 OTC forex pairs + 7 crypto OTC names.
 - **Asset-specific Strong UP/DOWN** candidates, 5m candle history, source status, score (indicator agreement, **not** win probability), ticker name, price, local candle time and de-duplicated local alert history.
 - **Native parallel scan:** 4 worker threads, source checked about every 5 minutes **while app is open**, with two-minute manual refresh cooldown.
@@ -17,16 +17,16 @@ This is a completely independent, paper-signal-only Android application.
 
 GitHub Actions: [Build Envarg OTC Multi Scanner](https://github.com/dwivedigaurav51-debug/Gaurav-data-save/actions/workflows/build-envarg-otc-multiscanner.yml).
 
-Open the newest **green successful** workflow run and download **Artifacts → Envarg-OTC-Multi-Scanner-V4**, extract the ZIP and install `Envarg-OTC-Multi-Scanner-V1.apk`. Do not use an older SHIB OTC artifact.
+Open the newest **green successful** workflow run and download **Artifacts → Envarg-OTC-Multi-Scanner-V4**, extract the ZIP and install `Envarg-OTC-Multi-Scanner-V4.apk`. Do not use an older SHIB OTC artifact.
 
 The workflow runs Node.js quote-validation tests and Gradle assembleDebug, and checks the APK contents. If the build is red, inspect its job logs instead of treating a previous APK as the new build. This README does not attest to a successful build.
 
 ## V4: compact UI, high-count demo trading, and honest in-progress results
 
-- The original `envargOtcMultiPaperV3_100only` wallet and prior trading records are **kept**; V4 upgrades the same Android package and does not erase history.
+- **Separate safe installation:** V4 has Android package `com.envarg.otcmultiscan.v4` and installs **alongside** original Multi Scanner V3. The V3 app and its existing 3 WIN/2 LOSS history remain in V3. Because the Android app storage is isolated, **V4 starts its own new virtual wallet and does not automatically import V3 trades**. This avoids the risk of losing old data due to per-run debug APK signature differences.
 - There is **no fixed five-trade or 100-trade limit**. Every qualifying 100/100 signal can start a new independent virtual trade, subject to the source, no duplicate signal, and one active trade per asset.
 - A **Demo Auto Top-up** option (default enabled) credits **₹10,000 virtual-only** when the wallet has less than the ₹200 stake. Top-ups are logged separately; they are **never counted in paper P/L, WIN/LOSS or accuracy**. Switch it off in the app to keep the original balance constraint.
-- The trade count, lifetime W/L statistics and entire saved ledger remain available in device storage; older entries are shown through **50-trade pagination** after the newest 25. Device storage is finite, so very large histories remain subject to storage capacity. The app displays a warning if saving fails.
+- V4 trade count, lifetime W/L statistics and entire V4 saved ledger remain available in V4 device storage; older entries are shown through **50-trade pagination** after the newest 25. Device storage is finite, so very large histories remain subject to storage capacity. The app displays a warning if saving fails.
 - Trade History and the 32-currency watchlist are now separate **collapsed sections** by default, each scrollable when expanded. The active-trades box has its own scroll region.
 - Each OPEN trade shows a **one-second 05:00 countdown**. While waiting, the card may show **INDICATIVE WIN**, **INDICATIVE LOSS** or **DRAW** *only when a newer valid five-minute source candle has actually been observed*. This is not a live tick or a settled result. No new source quote means **WAITING FOR NEW 5m PRICE**.
 - At/after the expiry, the trade remains OPEN until a suitable validated expiry source point is received. A verified **FINAL WIN or LOSS** shows in a large temporary screen and is saved to the collapsed history. Draws/voids remain visible in history, but are not counted as W/L.
