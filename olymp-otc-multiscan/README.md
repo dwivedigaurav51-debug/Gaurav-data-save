@@ -2,24 +2,34 @@
 
 This is a completely independent, paper-signal-only Android application.
 
-- **Package ID:** `com.envarg.otcmultiscan.v4`
-- **Launcher name:** Envarg OTC Multi V4
-- **Version:** 4.0
-- **Independent of older apps:** `com.envarg.shibotc`, `com.envarg.otcultimate`, **and old Multi Scanner V3** (`com.envarg.otcmultiscan`). All three previous apps, their balances and saved history remain on the phone.
+- **Package ID:** `com.envarg.otcmultiscan.v4fast`
+- **Launcher name:** Envarg OTC V4 Fast
+- **Version:** 4.1-fast
+- **Independent of older apps:** `com.envarg.shibotc`, `com.envarg.otcultimate`, **and old Multi Scanner V3** (`com.envarg.otcmultiscan`) **and V4** (`com.envarg.otcmultiscan.v4`). Their balances and saved histories remain on the phone.
 - **32 watchlist entries:** 25 OTC forex pairs + 7 crypto OTC names.
 - **Asset-specific Strong UP/DOWN** candidates, 5m candle history, source status, score (indicator agreement, **not** win probability), ticker name, price, local candle time and de-duplicated local alert history.
-- **Native parallel scan:** 4 worker threads, source checked about every 5 minutes **while app is open**, with two-minute manual refresh cooldown.
+- **Native parallel scan:** 4 worker threads; full 32-asset scan about every five minutes while open. Waiting/open paper assets also receive targeted checks about every 60 seconds (up to eight assets per check) to reduce detection delay without repeatedly fetching all 32. Includes manual Check Pending Now control with request cooldown.
 - **Independent feed checks:** wrong symbol, invalid/stale price or timestamp, insufficient history and missing 5m candles are rejected. Each instrument can show FEED ERROR or WARMUP; a website listing does **not** imply a usable live feed.
 - **Notification:** Android notification while running for a newly found qualifying fresh candle. Notifications and scanner do not run in background when app is fully closed.
 - **Not official:** Uses an observed `gw-plus.olymptrade.com` asset endpoint with no guarantee of ongoing public access or terminal-price equivalence. No login or real-money order execution.
 
 ## Build and download
 
-GitHub Actions: [Build Envarg OTC Multi Scanner](https://github.com/dwivedigaurav51-debug/Gaurav-data-save/actions/workflows/build-envarg-otc-multiscanner.yml).
+GitHub Actions: [Build Envarg OTC Multi Scanner](https://github.com/dwivedigaurav51-debug/Gaurav-data-save/actions/workflows/build-envarg-otc-multiscanner.yml?query=branch%3Av4-fast-paper-entry).
 
-Open the newest **green successful** workflow run and download **Artifacts → Envarg-OTC-Multi-Scanner-V4**, extract the ZIP and install `Envarg-OTC-Multi-Scanner-V4.apk`. Do not use an older SHIB OTC artifact.
+Open the newest **green successful** workflow run and download **Artifacts → Envarg-OTC-V4-Fast**, extract the ZIP and install `Envarg-OTC-V4-Fast.apk`. Do not use an older SHIB OTC artifact.
 
 The workflow runs Node.js quote-validation tests and Gradle assembleDebug, and checks the APK contents. If the build is red, inspect its job logs instead of treating a previous APK as the new build. This README does not attest to a successful build.
+
+## V4 Fast paper entry (V4 design retained)
+
+- Branch: `v4-fast-paper-entry` from the original V4 code. This is **not** a rewrite using V5. Android label **Envarg OTC V4 Fast** and separate package `com.envarg.otcmultiscan.v4fast`; installed V4 remains untouched.
+- **Immediate UI response:** 100/100 detected signals appear at once in the paper section's visible **WAITING ENTRY** banner (if the source candle cannot be used for immediate opening). When the next fresh candle is received the trade becomes **PAPER OPEN** and is tracked/settled by the original V4 logic. The signal itself is stored in Signal History immediately.
+- **Fast targeted checks:** if an asset has WAITING ENTRY, an open virtual trade or a recently detected 100/100 signal, scan that symbol again approximately every 60 seconds, limited to eight assets per cycle. Full 32-asset scans still happen on 5-minute boundaries. Priority scans don't flag unrelated assets as broken.
+- **Check Pending Now** initiates a targeted check (when not already scanning) rather than requesting all 32 assets. It cannot force the 5-minute source to publish a candle early or turn a stale quote into a valid paper entry.
+- **Notifications:** still only on actual 100/100 paper entry, not on queued-only signals or lower scores.
+- **Records:** because this is a separate Android app, existing V4 records stay inside V4, and Fast's new balance and history begin independently. No uninstall, no copying or deletion of V4 data.
+- The APK build is only confirmed after GitHub Actions reports success; live feed reliability, source prices and actual paper-entry latency must be checked on the phone.
 
 ## V4: compact UI, high-count demo trading, and honest in-progress results
 
