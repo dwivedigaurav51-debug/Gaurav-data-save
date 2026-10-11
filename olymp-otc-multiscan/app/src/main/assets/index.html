@@ -67,7 +67,7 @@
    <div id="paperOpenList" class="papertrade-list active-scroll"><p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p></div>
    <div class="sectionhead"><h2>100/100 Signals Waiting Entry</h2></div>
    <div id="paperArmedList" class="papertrade-list"><p class="empty">नई कैंडल का इंतजार कर रहे सिग्नल यहाँ आएँगे।</p></div>
-   <p class="note">सिर्फ 100/100 संकेत एंट्री के योग्य होंगे। अगर latest 5m कैंडल पहले ही पुरानी है तो WAITING ENTRY दिखेगा; अगली नई कैंडल मिलने पर ही वर्चुअल एंट्री खुलेगी। OPEN होने के बाद ENTRY FROM और ENTRY UNTIL (60 सेकंड), तथा 5 मिनट बाद की expiry दिखाई जाएगी। स्रोत कैंडल की कीमत लाइव खरीदी जा सकने वाली कीमत नहीं है।</p>
+   <p class="note">सिर्फ 100/100 संकेत एंट्री के योग्य होंगे; ट्रेड की संख्या पर सीमा नहीं है। डेमो ऑटो-रिफिल को लाभ या प्रदर्शन में नहीं गिना जाएगा। अगर latest 5m कैंडल पहले ही पुरानी है तो WAITING ENTRY दिखेगा; अगली नई कैंडल मिलने पर ही वर्चुअल एंट्री खुलेगी। OPEN होने के बाद ENTRY FROM और ENTRY UNTIL (60 सेकंड), तथा 5 मिनट बाद की expiry दिखाई जाएगी। स्रोत कैंडल की कीमत लाइव खरीदी जा सकने वाली कीमत नहीं है।</p>
    <div class="divider"></div>
    <details id="paperHistoryDetails" class="foldbox">
     <summary><span><strong>📜 Virtual Trade History</strong><small id="paperHistoryCount">0 completed trades · Tap to check history</small></span><span class="chevron">⌄</span></summary>
@@ -81,9 +81,10 @@
       <div id="paperByAsset" class="asset-report"><p class="empty">अभी कोई ट्रेड डेटा नहीं।</p></div>
      </details>
      <div id="paperSkipped" class="paper-subline">0 outdated / unavailable entries skipped</div>
+     <div id="paperSaveWarning" class="save-warning" role="status"></div>
     </div>
    </details>
-   <p class="note">WIN / LOSS सिर्फ 5-minute source quotes पर आधारित अनुमानित virtual परिणाम हैं, असली पैसा या प्रमाणित Olymptrade payout नहीं। फीड न मिले तो PENDING या VOID दिखेगा, नकली WIN / LOSS नहीं।</p>
+   <p class="note">चालू ट्रेड में LIVE WIN/LOSS केवल नई मिली 5-minute source कीमत के अनुसार अस्थायी स्थिति होगी। आखिरी WIN/LOSS expiry के बाद पुष्टि होने पर दिखेगा। WIN / LOSS सिर्फ 5-minute source quotes पर आधारित अनुमानित virtual परिणाम हैं, असली पैसा या प्रमाणित Olymptrade payout नहीं। फीड न मिले तो PENDING या VOID दिखेगा, नकली WIN / LOSS नहीं।</p>
   </section>
 
   <details id="currencyDetails" class="card watch foldbox">
