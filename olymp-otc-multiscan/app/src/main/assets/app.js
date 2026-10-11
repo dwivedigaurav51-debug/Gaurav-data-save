@@ -34,7 +34,7 @@ function olympButton(symbol){
  if(!INDEX[symbol])return '';
  return '<button type="button" class="secondary olymp-open" data-olymp-symbol="'+esc(symbol)+'" title="Olymptrade खोलें; करेंसी कॉपी होगी">↗ Open Olymptrade</button>';
 }
-document.addEventListener('click',event=>{
+if(typeof document.addEventListener==='function')document.addEventListener('click',event=>{
  const button=event.target.closest?.('.olymp-open');
  if(!button)return;
  const symbol=button.getAttribute('data-olymp-symbol');
