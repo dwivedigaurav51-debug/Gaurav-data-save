@@ -251,6 +251,22 @@ window.PaperVirtual=(()=>{
  }
  function renderOpen(){
   const open=wallet.trades.filter(t=>t.status==='OPEN');
+  const queued=wallet.armed||[];
+  const latest=open[0],pending=queued[0];
+  const status=$('#paperEntryStatus');
+  if(latest){
+    status.textContent='PAPER OPEN · '+latest.name+' '+latest.side+' · ₹'+latest.stake+' · expiry '+time(latest.expiresAt)+(open.length>1?' · '+open.length+' total open':'');
+    status.className='paper-entry-live';
+  }else if(pending){
+    status.textContent='100/100 RECEIVED · '+pending.name+' '+pending.side+' · WAITING for next 5m candle'+(queued.length>1?' · '+queued.length+' waiting':'');
+    status.className='paper-entry-wait';
+  }else{
+    const last=wallet.trades[0];
+    status.textContent=last&&last.status!=='OPEN'
+      ?'Last virtual result: '+last.name+' · '+last.status+' · waiting for next 100/100 signal'
+      :'No active paper entry · waiting for 100/100 signal';
+    status.className='paper-entry-idle';
+  }
   $('#paperPending').textContent=open.length+' OPEN · '+wallet.armed.length+' WAITING';
   $('#paperArmedList').innerHTML=wallet.armed.length?wallet.armed.map(q=>
    '<div class="papertrade"><div class="head"><strong>'+safe(q.name)+' · '+safe(q.side)+' · 100/100</strong><span class="pill">WAITING ENTRY</span></div>'+ 
