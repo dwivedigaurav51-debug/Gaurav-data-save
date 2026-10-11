@@ -18,7 +18,7 @@ const SCAN_OFFSET=12000; // aim for shortly after each 5-minute source boundary
 const ALERT_FRESHNESS=420000; // 5m last-close quotes may reach us one cycle late
 const REQUIRED_SCORE=100; // strict indicator agreement, NOT a predicted win rate
 let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastFullScan=0,lastPriorityScan=0,
-    activeScanSymbols=[],activeScanKind='full',priorityCursor=0,
+    activeScanSymbols=[],activeScanKind='full',priorityCursor=0,lastCompletedScanSize=32,lastCompletedScanKind='full',
     lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),
     activeTab='all',scanDoneCount=0,seenResults=new Set();
 let history=readStore('envargMultiSignalHistoryV3_100only',[]);
@@ -162,7 +162,7 @@ function addSignal(asset,state){
  }
 }
 window.nativeAssetResult=function(symbol,rawText){
- if(!inFlight||!INDEX[symbol]||seenResults.has(symbol))return;
+ if(!inFlight||!INDEX[symbol]||!activeScanSymbols.includes(symbol)||seenResults.has(symbol))return;
  seenResults.add(symbol);
  const old=STATES[symbol],now=Date.now();
  try{
@@ -191,6 +191,8 @@ window.nativeAssetError=function(symbol,error){
 window.nativeScanDone=function(){
  if(!inFlight)return;
  inFlight=false;completedAt=Date.now();scanDoneCount++;
+ lastCompletedScanSize=activeScanSymbols.length;
+ lastCompletedScanKind=activeScanKind;
  // An accelerated check touches only the selected currencies; do not mark
  // the other 32-market watchlist entries as FEED ERROR.
  for(const symbol of activeScanSymbols){
@@ -201,7 +203,7 @@ window.nativeScanDone=function(){
  activeScanSymbols=[];
  updateUI();
 };
-function focusSymbols(){
+function focusSymbols(rotate=false){
  const wallet=PAPER.getWallet();
  const waiting=(wallet.armed||[]).map(t=>t.symbol);
  const open=(wallet.trades||[]).filter(t=>t.status==='OPEN').map(t=>t.symbol);
@@ -209,7 +211,7 @@ function focusSymbols(){
  const all=[...new Set([...waiting,...open,...recent].filter(x=>INDEX[x]))];
  if(all.length<=PRIORITY_LIMIT)return all;
  const selected=Array.from({length:PRIORITY_LIMIT},(_,i)=>all[(priorityCursor+i)%all.length]);
- priorityCursor=(priorityCursor+PRIORITY_LIMIT)%all.length;
+ if(rotate)priorityCursor=(priorityCursor+PRIORITY_LIMIT)%all.length;
  return selected;
 }
 function startScan(manual=false,focus=null){
@@ -229,7 +231,8 @@ function startScan(manual=false,focus=null){
  }
  const selected=isFocus?[...new Set(focus.filter(x=>INDEX[x]))].slice(0,PRIORITY_LIMIT):ASSETS.map(a=>a.symbol);
  if(!selected.length)return false;
- if(isFocus)lastPriorityScan=now;else lastFullScan=now;
+ if(isFocus)lastPriorityScan=now;
+ else {lastFullScan=now;lastPriorityScan=Math.max(lastPriorityScan,now)}
  lastStart=now;startedAt=now;inFlight=true;activeScanKind=isFocus?'priority':'full';
  activeScanSymbols=selected;seenResults=new Set();
  for(const symbol of selected){STATES[symbol].status='CHECKING';STATES[symbol].error='';STATES[symbol].strong=false}
@@ -245,7 +248,7 @@ function startScan(manual=false,focus=null){
  return true;
 }
 function checkPendingNow(manual=false){
- const selected=focusSymbols();
+ const selected=focusSymbols(true);
  if(!selected.length){
   if(manual)$('#scanSub').textContent='No waiting or open paper positions to check yet';
   return false;
@@ -329,12 +332,12 @@ function updateUI(){
   '<div><div class="side '+(row.side==='DOWN'?'down':'')+'">'+esc(row.side)+'</div><div class="score">'+Number(row.score||0)+'/100</div></div></div>';
  }).join(''):'<p class="empty">अभी कोई Strong Signal दर्ज नहीं है।</p>';
  const checked=activeScanSymbols.length?activeScanSymbols.filter(x=>seenResults.has(x)).length:seenResults.size;
- const scanTotal=activeScanSymbols.length||ASSETS.length;
+ const scanTotal=activeScanSymbols.length||lastCompletedScanSize;
  $('#scanBtn').disabled=inFlight;
  $('#scanBtn').textContent=inFlight?'Scanning…':'↻ Scan Now';
  $('#paperQuickBtn').disabled=inFlight||!focusSymbols().length;
  $('#scanStatus').textContent=inFlight?(activeScanKind==='priority'?'Fast paper check ':'Scanning ')+checked+'/'+scanTotal+' OTC assets':
-   (scanDoneCount?'Last scan complete · '+checked+'/'+ASSETS.length:'Scanner ready');
+   (scanDoneCount?(lastCompletedScanKind==='priority'?'Fast paper check':'Full scan')+' complete · '+checked+'/'+scanTotal:'Scanner ready');
  $('#scanSub').textContent=inFlight?(activeScanKind==='priority'?'Only currencies with 100/100 waiting/open paper entries':'Checking all 32 OTC 5-minute candles • 4 workers'):
    (scanDoneCount?'Every 5 minutes while the app is open':'Tap Scan Now or wait for auto scan');
  $('#scanDot').className='dot '+(inFlight?'':scanDoneCount&&$('#liveCount').textContent!=='0'?'good':scanDoneCount?'bad':'');
