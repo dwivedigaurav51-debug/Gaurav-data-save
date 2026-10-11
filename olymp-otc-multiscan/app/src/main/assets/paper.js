@@ -5,6 +5,7 @@ window.PaperVirtual=(()=>{
  const KEY='envargOtcMultiPaperV3_100only'; // V2 ledger remains stored separately; never overwrite it
  const INITIAL=10000,STAKE=200,PAYOUT=.90,DURATION=300000,ENTRY_WINDOW=60000,MAX_QUOTE_AGE=120000,SETTLEMENT_GRACE=300000;
  const SIGNAL_MAX_AGE=420000,ARM_TIMEOUT=900000,REQUIRED_SCORE=100;
+ const MAX_SETTLEMENT_WAIT=1200000; // 20 min after expiry; never invent WIN/LOSS
  const $=s=>document.querySelector(s);
  const getSaved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}};
  const fallback=()=>({version:3,initial:INITIAL,balance:INITIAL,auto:true,autoRefill:true,refillTotal:0,topups:[],trades:[],skipped:[],armed:[]});
@@ -20,6 +21,7 @@ window.PaperVirtual=(()=>{
  let saveWarning='';
  let historyVisible=25;
  const resultQueue=[];
+ let lastRecovery={at:0,count:0};
  let resultTimer=null;
  let resultShown=false;
  const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
@@ -53,6 +55,37 @@ window.PaperVirtual=(()=>{
   showNextFinalResult();
  }
  $('#paperResultDismiss').addEventListener('click',dismissFinalResult);
+  function voidStalledTrades(now=Date.now()){
+  const timedOut=[];
+  for(const trade of wallet.trades){
+   if(trade.status!=='OPEN'||!Number.isFinite(trade.expiresAt)||now<trade.expiresAt+MAX_SETTLEMENT_WAIT)continue;
+   // No broker expiry quote means neither a verified WIN nor a verified LOSS.
+   trade.status='VOID';
+   trade.pnl=0;
+   trade.settledAt=now;
+   trade.exitAt=null;
+   trade.exitPrice=null;
+   trade.diagnostic='No verified expiry-source quote within 20 minutes after scheduled expiry. Paper stake refunded. Not counted as WIN or LOSS.';
+   wallet.balance+=Number(trade.stake)||STAKE;
+   timedOut.push({...trade});
+  }
+  if(timedOut.length){
+    lastRecovery={at:now,count:timedOut.length};
+    save();
+  }
+  return timedOut;
+ }
+ function reportFeedError(symbol,reason,now=Date.now()){
+  let changed=false;
+  for(const trade of wallet.trades){
+   if(trade.status!=='OPEN'||trade.symbol!==symbol)continue;
+   trade.lastFeedError=String(reason||'Source unavailable').slice(0,150);
+   trade.lastFeedAttemptAt=now;
+   changed=true;
+  }
+  if(changed)save();
+  return voidStalledTrades(now);
+ }
  function openCount(){return wallet.trades.filter(t=>t.status==='OPEN').length}
  function ensureDemoFunds(now){
   if(wallet.balance>=STAKE)return true;
@@ -154,6 +187,9 @@ window.PaperVirtual=(()=>{
   let previewChanged=false;
   for(const t of wallet.trades){
    if(t.status!=='OPEN'||t.symbol!==symbol)continue;
+   t.lastFeedAttemptAt=observedAt;
+   t.lastSourceTs=last.ts;
+   t.lastFeedError='';
    // "LIVE" below is ONLY the newest observed 5-minute source price. It
    // MUST NOT be called an executable tick quote or final expiry result.
    const fresh=points.filter(p=>Number.isFinite(p.c)&&p.c>0&&Number.isFinite(p.ts)&&
@@ -195,6 +231,7 @@ window.PaperVirtual=(()=>{
    }
   }
   if(updates.length||previewChanged)save();
+  updates.push(...voidStalledTrades(observedAt));
   for(const finished of updates){
    if(finished.status==='WIN'||finished.status==='LOSS')resultQueue.push({...finished});
   }
@@ -223,8 +260,10 @@ window.PaperVirtual=(()=>{
   const pill=t.status==='WIN'?'winpill':t.status==='LOSS'?'losspill':'';
   const remaining=t.expiresAt-Date.now();
   const expiryPending=isOpen&&remaining<=0;
-  const sub=isOpen?(remaining>0?'Trade in progress · source-only preview':'EXPIRY REACHED · FINAL RESULT PENDING · waiting for a validated 5m source close'):
+  const sub=isOpen?(remaining>0?'Trade in progress · source-only preview':'EXPIRY REACHED · RESULT PENDING · auto-refund if no valid quote within 20 minutes after expiry'):
        (t.exitAt?'Settled source '+time(t.exitAt):'No matching expiry quote');
+  const waitRemaining=t.expiresAt+MAX_SETTLEMENT_WAIT-Date.now();
+  const delayedStatus=isOpen&&expiryPending?'<div class="sub">Refund / VOID check in '+safe(countdown(waitRemaining))+' · last source candle '+safe(time((t.lastSourceTs||t.sourceTs)*1000))+(t.lastFeedError?' · Feed error: '+safe(t.lastFeedError):'')+'</div>':'';
   const expiryClock=isOpen?'<div class="countdown-large '+(remaining<=0?'expired':'')+'"><span><small>Expiry Countdown</small><small style="display:block;margin-top:5px">Target '+safe(time(t.expiresAt))+'</small></span><strong>'+safe(countdown(remaining))+'</strong></div>':'';
   const freshPreview=isOpen&&t.previewAt&&Date.now()-t.previewAt<=720000;
   const livePreview=isOpen
@@ -242,7 +281,7 @@ window.PaperVirtual=(()=>{
      '</div></div>'
    :'';
   return '<div class="papertrade '+cls+'"><div class="head"><strong>'+safe(t.name)+' · '+safe(t.side)+' '+(t.side==='UP'?'↑':'↓')+'</strong><span class="pill '+pill+'">'+status+(p!==null?' · '+safe(fmt(p)):'')+'</span></div>'+
-   expiryClock+livePreview+
+   expiryClock+livePreview+delayedStatus+
    '<div class="timerline">'+safe(sub)+'</div>'+
    '<div class="tradegrid">'+
      '<div><small>Entry / Buy From</small><b>'+safe(time(t.entryFrom))+'</b></div>'+
@@ -255,6 +294,8 @@ window.PaperVirtual=(()=>{
    '<div class="sub">Opened '+safe(time(t.openedAt))+' · Signal candle '+safe(time(t.sourceTs*1000))+' · '+(t.exitAt?'Exit '+safe(time(t.exitAt)):'Awaiting source result')+'</div></div>';
  }
  function renderOpen(){
+  const fixed=voidStalledTrades();
+  if(fixed.length){render();return}
   const open=wallet.trades.filter(t=>t.status==='OPEN');
   $('#paperPending').textContent=open.length+' OPEN · '+wallet.armed.length+' WAITING';
   $('#paperArmedList').innerHTML=wallet.armed.length?wallet.armed.map(q=>
@@ -277,6 +318,7 @@ window.PaperVirtual=(()=>{
   if(remaining.length!==wallet.armed.length){wallet.armed=remaining;save()}
  }
  function render(){
+  voidStalledTrades();
   expireQueued();
   const t=totals();
   $('#paperBalance').textContent=fmt(wallet.balance);
@@ -286,6 +328,7 @@ window.PaperVirtual=(()=>{
   $('#paperPnl').textContent=(t.pnl>0?'+':'')+fmt(t.pnl);
   $('#paperPnl').className=t.pnl>0?'win':t.pnl<0?'lose':'';
   $('#paperOpenCount').textContent=t.open;
+  $('#paperVoidNotice').textContent=lastRecovery.count?'Last repair: '+lastRecovery.count+' stalled paper trade(s) VOID / refunded · '+time(lastRecovery.at):'';
   $('#paperArmedCount').textContent=t.armed;
   $('#paperTotalTrades').textContent=t.trades.toLocaleString('en-IN');
   $('#paperRefillTotal').textContent=fmt(wallet.refillTotal);
@@ -330,5 +373,5 @@ window.PaperVirtual=(()=>{
    if(!confirm('Reset ONLY Multi Scanner virtual balance, trade history and accuracy to ₹10,000?'))return;
    wallet=fallback();historyVisible=25;save();render();
  });
- return {onStrong,onQuote,onFeed,getTrade,isQueued,totals,render,renderOpen,expireQueued,getWallet:()=>wallet};
+ return {onStrong,onQuote,onFeed,voidStalledTrades,reportFeedError,getTrade,isQueued,totals,render,renderOpen,expireQueued,getWallet:()=>wallet};
 })();
