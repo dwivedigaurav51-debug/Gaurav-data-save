@@ -31,6 +31,28 @@ window.PaperVirtual=(()=>{
    const seconds=Math.ceil(ms/1000);
    return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
  };
+ function showNextFinalResult(){
+  if(resultShown||!resultQueue.length)return;
+  const t=resultQueue.shift();
+  if(t.status!=='WIN'&&t.status!=='LOSS'){showNextFinalResult();return}
+  resultShown=true;
+  const overlay=$('#paperResultOverlay'),card=$('#paperResultCard');
+  card.className='result-modal'+(t.status==='LOSS'?' loss':'');
+  $('#paperResultBig').textContent=t.status;
+  $('#paperResultSymbol').textContent=t.name+' · '+t.side+' · 100/100';
+  $('#paperResultProfit').textContent=(t.pnl>0?'+':'')+fmt(t.pnl);
+  $('#paperResultPrices').textContent='Entry '+price(t.entryPrice)+' → Exit '+price(t.exitPrice)+' · Expiry '+time(t.expiresAt);
+  overlay.hidden=false;
+  // Keep the large result visible briefly, then reveal the next pending result.
+  if(typeof setTimeout==='function')resultTimer=setTimeout(dismissFinalResult,6500);
+ }
+ function dismissFinalResult(){
+  if(resultTimer!==null&&typeof clearTimeout==='function')clearTimeout(resultTimer);
+  resultTimer=null;resultShown=false;
+  $('#paperResultOverlay').hidden=true;
+  showNextFinalResult();
+ }
+ $('#paperResultDismiss').addEventListener('click',dismissFinalResult);
  function openCount(){return wallet.trades.filter(t=>t.status==='OPEN').length}
  function ensureDemoFunds(now){
   if(wallet.balance>=STAKE)return true;
@@ -129,8 +151,21 @@ window.PaperVirtual=(()=>{
   const last=points.at(-1);
   if(!last||!Number.isFinite(last.ts))return [];
   const updates=[];
+  let previewChanged=false;
   for(const t of wallet.trades){
    if(t.status!=='OPEN'||t.symbol!==symbol)continue;
+   // "LIVE" below is ONLY the newest observed 5-minute source price. It
+   // MUST NOT be called an executable tick quote or final expiry result.
+   const fresh=points.filter(p=>Number.isFinite(p.c)&&p.c>0&&Number.isFinite(p.ts)&&
+     p.ts>t.sourceTs&&p.ts*1000<=observedAt&&observedAt-p.ts*1000<=720000).at(-1);
+   if(fresh&&(!t.previewAt||fresh.ts*1000>t.previewAt)){
+     const flat=Math.abs(fresh.c-t.entryPrice)<=Math.max(1e-10,t.entryPrice*1e-10);
+     t.previewPrice=fresh.c;
+     t.previewAt=fresh.ts*1000;
+     t.previewObservedAt=observedAt;
+     t.previewStatus=flat?'DRAW':(t.side==='UP'?fresh.c>t.entryPrice:fresh.c<t.entryPrice)?'WIN':'LOSS';
+     previewChanged=true;
+   }
    if(observedAt<t.expiresAt)continue; // no future win/loss guesses
    const candidates=points.filter(p=>
      Number.isFinite(p.c)&&p.c>0&&
@@ -159,7 +194,11 @@ window.PaperVirtual=(()=>{
     updates.push(t);
    }
   }
-  if(updates.length)save(); // no WIN/LOSS notifications: user requested ONLY 100/100 entry alerts
+  if(updates.length||previewChanged)save();
+  for(const finished of updates){
+   if(finished.status==='WIN'||finished.status==='LOSS')resultQueue.push({...finished});
+  }
+  showNextFinalResult();
   return updates;
  }
  function getTrade(symbol,sourceTs){
@@ -183,9 +222,22 @@ window.PaperVirtual=(()=>{
   const cls=t.status==='WIN'?'wintrade':t.status==='LOSS'?'losstrade':t.status==='VOID'?'voidtrade':'';
   const pill=t.status==='WIN'?'winpill':t.status==='LOSS'?'losspill':'';
   const remaining=t.expiresAt-Date.now();
-  const sub=isOpen?(remaining>0?'Expiry in '+countdown(remaining):'Expiry passed — waiting for validated future 5m quote'):
+  const sub=isOpen?(remaining>0?'Trade in progress · source-only preview':'Expiry reached — verifying next source close'):
        (t.exitAt?'Settled source '+time(t.exitAt):'No matching expiry quote');
+  const expiryClock=isOpen?'<div class="countdown-large '+(remaining<=0?'expired':'')+'"><span><small>Expiry Countdown</small><small style="display:block;margin-top:5px">Target '+safe(time(t.expiresAt))+'</small></span><strong>'+safe(countdown(remaining))+'</strong></div>':'';
+  const freshPreview=isOpen&&t.previewAt&&Date.now()-t.previewAt<=720000;
+  const livePreview=isOpen
+   ?'<div class="live-trade-preview"><div class="current">'+
+     (freshPreview
+      ?'<span class="'+(t.previewStatus==='WIN'?'win':t.previewStatus==='LOSS'?'lose':'flat')+'">INDICATIVE '+safe(t.previewStatus)+' · 5m SOURCE</span>'
+      :'<span class="flat">WAITING FOR NEW 5m PRICE</span>')+
+     '</div><div class="detail">'+(freshPreview
+       ?'Source '+safe(time(t.previewAt))+' · latest observed price '+safe(price(t.previewPrice))+' · NOT FINAL until expiry'
+       :'5-minute quote has not updated since entry. Do not infer WIN / LOSS.')+
+     '</div></div>'
+   :'';
   return '<div class="papertrade '+cls+'"><div class="head"><strong>'+safe(t.name)+' · '+safe(t.side)+' '+(t.side==='UP'?'↑':'↓')+'</strong><span class="pill '+pill+'">'+status+(p!==null?' · '+safe(fmt(p)):'')+'</span></div>'+
+   expiryClock+livePreview+
    '<div class="timerline">'+safe(sub)+'</div>'+
    '<div class="tradegrid">'+
      '<div><small>Entry / Buy From</small><b>'+safe(time(t.entryFrom))+'</b></div>'+
@@ -205,9 +257,11 @@ window.PaperVirtual=(()=>{
    '<div class="timerline">100/100 confirmed. Waiting next fresh 5m candle.</div>'+ 
    '<div class="sub">Signal candle '+safe(time(q.sourceTs*1000))+' · Armed '+safe(time(q.armedAt))+' · timeout '+safe(time(q.timeoutAt))+'</div></div>'
   ).join(''):'<p class="empty">अभी कोई 100/100 सिग्नल एंट्री का इंतजार नहीं कर रहा।</p>';
-  $('#paperOpenList').innerHTML=open.length
+  const list=$('#paperOpenList'),savedScroll=Number(list.scrollTop)||0;
+  list.innerHTML=open.length
    ?open.map(t=>tradeCard(t,true)).join('')
    :'<p class="empty">अभी कोई खुली वर्चुअल ट्रेड नहीं।</p>';
+  list.scrollTop=savedScroll;
  }
  function expireQueued(now=Date.now()){
   const remaining=[];
