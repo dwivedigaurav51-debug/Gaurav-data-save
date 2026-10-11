@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <application
-        android:label="Envarg OTC Multi V4"
+        android:label="Envarg OTC Multi V5"
         android:icon="@drawable/ic_otcscanner"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:allowBackup="true"
