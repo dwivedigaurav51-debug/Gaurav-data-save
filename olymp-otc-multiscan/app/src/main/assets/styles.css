@@ -38,3 +38,51 @@
 .signalrow .meta-timing{display:block;margin-top:6px;font-size:11px;color:#d2e8e9;line-height:1.5}
 .signalrow .meta-timing.closed{color:#d9ad80}
 @media(max-width:680px){.paperstats{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.paperstats article{padding:10px}.paperstats article strong{font-size:20px}.papertrade .tradegrid{grid-template-columns:repeat(2,minmax(0,1fr))}.papercontrols{align-items:flex-start}.paper .sectionhead h2{font-size:15px}}
+
+/* V4 compact and expandable reports */
+.foldbox{border:1px solid #2a4860;border-radius:15px;background:#0a192c;margin:12px 0;padding:0;overflow:hidden}
+.foldbox>summary{display:flex;align-items:center;justify-content:space-between;list-style:none;cursor:pointer;gap:12px;padding:14px;font-size:14px;color:#e4f4ff}
+.foldbox>summary::-webkit-details-marker{display:none}
+.foldbox>summary strong{font-size:14px}
+.foldbox>summary small{display:block;margin-top:5px;color:#91b3ca;font-size:11px;font-weight:normal}
+.foldbox .chevron{font-size:22px;color:#87c0ce;transition:transform .2s}
+.foldbox[open]>.chevron,.foldbox[open]>summary .chevron{transform:rotate(180deg)}
+.foldbody{border-top:1px solid #203d53;padding:13px}
+.foldbody .sectionhead h2{font-size:14px;margin-bottom:4px}
+.foldbody .secondary{margin-top:0}
+.watch.foldbox{padding:0}
+.history.foldbox{padding:0}
+.active-scroll{max-height:480px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+.compact-scroll{max-height:390px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:4px}
+.paper-toggles{display:flex;flex-direction:column;gap:6px}
+.paper-toggles .check{margin:1px 0;font-size:12px}
+.paper-toggles .check input{flex-shrink:0}
+.live-trade-preview{margin-top:10px;padding:11px;border-radius:12px;border:1px solid #36526a;background:#0b2535}
+.live-trade-preview .current{font-size:15px;font-weight:900;display:flex;align-items:center;gap:9px;justify-content:space-between;flex-wrap:wrap}
+.live-trade-preview .current .win{color:#38e2a9}
+.live-trade-preview .current .lose{color:#ff768b}
+.live-trade-preview .current .flat{color:#ffd283}
+.live-trade-preview .detail{font-size:10px;margin-top:6px;color:#8fadc6;line-height:1.5}
+.papertrade .countdown-large{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;background:linear-gradient(130deg,#123a46,#10273e);border:1px solid #2e6072;border-radius:12px;margin-top:10px}
+.papertrade .countdown-large small{font-size:11px;color:#a9c9d6;font-weight:700}
+.papertrade .countdown-large strong{font-size:30px;font-variant-numeric:tabular-nums;color:#54e7d2;letter-spacing:1px}
+.papertrade .countdown-large.expired strong{color:#ffd38b}
+.papertrade .countdown-large.expired{border-color:#70583e}
+.papertrade .timerline{font-variant-numeric:tabular-nums}
+.paperstats{grid-template-columns:repeat(4,minmax(0,1fr))}
+[hidden]{display:none!important}
+.result-overlay{position:fixed;inset:0;z-index:9999;background:rgba(2,9,20,.9);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(7px)}
+.result-modal{text-align:center;background:linear-gradient(145deg,#123547,#081a2f);border:2px solid #36dba0;border-radius:28px;width:min(100%,480px);padding:28px 18px;box-shadow:0 24px 90px rgba(0,0,0,.65)}
+.result-modal.loss{border-color:#ff7186;background:linear-gradient(145deg,#422338,#101b30)}
+.result-modal.draw{border-color:#e6ba66}
+.result-modal.void{border-color:#8099b6}
+.result-overline{font-size:10px;font-weight:900;letter-spacing:.12em;color:#b9dbeb}
+.result-big{font-size:clamp(55px,13vw,88px);font-weight:1000;line-height:1.12;margin:13px 0;color:#33eab0;text-shadow:0 4px 34px rgba(43,222,155,.34)}
+.result-modal.loss .result-big{color:#ff6b82;text-shadow:0 4px 34px rgba(240,78,110,.3)}
+.result-modal.draw .result-big{color:#edc571}
+.result-modal.void .result-big{color:#b5c5df}
+.result-symbol{font-size:19px;font-weight:900;color:#edf8ff}
+.result-profit{font-size:26px;font-weight:900;margin:9px 0;font-variant-numeric:tabular-nums}
+.result-prices{font-size:13px;color:#afd0df;line-height:1.6;margin:12px 0}
+.result-note{font-size:11px;color:#89a6ba;margin:11px 0 21px}
+@media(max-width:680px){.paperstats{grid-template-columns:repeat(2,minmax(0,1fr))}.foldbody{padding:10px}.result-modal{padding:24px 14px}.result-big{font-size:64px}}
