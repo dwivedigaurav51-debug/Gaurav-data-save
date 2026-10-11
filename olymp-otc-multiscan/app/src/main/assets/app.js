@@ -23,6 +23,10 @@ function readStore(key,fallback){
  try{const value=localStorage.getItem(key);return value===null?fallback:JSON.parse(value)}catch(_){return fallback}
 }
 function writeStore(key,val){try{localStorage.setItem(key,JSON.stringify(val))}catch(_){}}
+function olympButton(symbol){
+ if(!INDEX[symbol])return '';
+ return '<button type="button" class="secondary olymp-open" data-olymp-symbol="'+esc(symbol)+'">↗ Open Olymptrade</button>';
+}
 function esc(input){return String(input??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function prettyTime(ms){if(!ms)return '—';return new Date(ms).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
 function fmtPrice(p){if(!Number.isFinite(p))return '—';if(p>=1000)return p.toLocaleString('en-US',{maximumFractionDigits:3});return p.toLocaleString('en-US',{minimumFractionDigits:p<0.01?5:4,maximumFractionDigits:7})}
@@ -252,7 +256,7 @@ function updateUI(){
   '<span class="meta">Latest price '+esc(fmtPrice(s.price))+' · candle '+esc(prettyTime(s.lastTs*1000))+'</span>'+
   '<span class="meta-timing '+(!trade?'closed':'')+'">'+esc(buyText)+'</span></div>'+
   '<div><div class="side '+(s.side==='DOWN'?'down':'')+'">'+s.side+' '+(s.side==='UP'?'↑':'↓')+'</div>'+
-  '<div class="score">Strong score '+s.score+'/100</div></div></div>'
+  '<div class="score">Strong score '+s.score+'/100</div>'+olympButton(s.asset.symbol)+'</div></div>'
  }).join(''):'<p class="empty">अभी कोई ताज़ा Strong Signal नहीं मिला। नीचे देखो कौन-सी करेंसी की फीड काम कर रही है और कौन-सी शर्तें पूरी नहीं हैं।</p>';
  const text=$('#search').value.trim().toLowerCase();
  const assets=ASSETS.filter(a=>{
@@ -311,7 +315,15 @@ document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener(
  document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('selected',b===button));
  updateUI();
 }));
-$('#scanBtn').addEventListener('click',()=>startScan(true));
+if(typeof document.addEventListener==='function')document.addEventListener('click',event=>{
+ const button=event.target.closest?.('.olymp-open');
+ if(!button)return;
+ const symbol=button.getAttribute('data-olymp-symbol');
+ if(!INDEX[symbol])return;
+ if(window.MultiBridge?.openOlymptrade)window.MultiBridge.openOlymptrade(symbol);
+ else alert('यह बटन Android APK में काम करेगा।');
+});
+ $('#scanBtn').addEventListener('click',()=>startScan(true));
 $('#clearHistory').addEventListener('click',()=>{
  if(confirm('Clear Multi Scanner signal history only?')){
   history=[];writeStore('envargMultiSignalHistoryV3_100only',history);updateUI();
