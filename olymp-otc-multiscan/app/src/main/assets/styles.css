@@ -86,3 +86,5 @@
 .result-prices{font-size:13px;color:#afd0df;line-height:1.6;margin:12px 0}
 .result-note{font-size:11px;color:#89a6ba;margin:11px 0 21px}
 @media(max-width:680px){.paperstats{grid-template-columns:repeat(2,minmax(0,1fr))}.foldbody{padding:10px}.result-modal{padding:24px 14px}.result-big{font-size:64px}}
+
+.save-warning{display:none;margin:9px 0;padding:10px;border-radius:11px;font-size:12px;font-weight:700}.save-warning:not(:empty){display:block;background:#4b2c2d;border:1px solid #f18585;color:#fff0e5}
