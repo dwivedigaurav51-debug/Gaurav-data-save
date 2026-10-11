@@ -46,7 +46,7 @@ assert.equal(get().onStrong(asset('EURUSD_OTC'),item).opened,false,'No duplicate
 assert.equal(get().getWallet().balance,9800,'Duplicate does not double-charge');
 
 clock.now=(t0+601)*1000;
-const prices1=[{ts:t0,c:100},{ts:t0+300,c:100.1},{ts:t0+600,c:101}];
+const prices1=[{ts:t0,c:100},{ts:t0+300,c:100.1},{ts:t0+360,c:101},{ts:t0+600,c:101}];
 let outcomes=get().onFeed('EURUSD_OTC',prices1,clock.now,true);
 assert.equal(outcomes.length,1,'Future eligible source price settles trade');
 assert.equal(outcomes[0].status,'WIN');
@@ -58,7 +58,7 @@ assert.equal(notifications.length,0,'WIN/LOSS notification suppressed; 100/100 e
 item={side:'DOWN',score:100,price:100,lastTs:t0+600};
 assert.equal(get().onStrong(asset('GBPJPY_OTC'),item).opened,true);
 clock.now=(t0+1201)*1000;
-let outcomes2=get().onFeed('GBPJPY_OTC',[{ts:t0+600,c:100},{ts:t0+900,c:100.01},{ts:t0+1200,c:101}],clock.now,true);
+let outcomes2=get().onFeed('GBPJPY_OTC',[{ts:t0+600,c:100},{ts:t0+900,c:100.01},{ts:t0+960,c:101},{ts:t0+1200,c:101}],clock.now,true);
 assert.equal(outcomes2.length,1);
 assert.equal(outcomes2[0].status,'LOSS');
 assert.equal(outcomes2[0].pnl,-200);
@@ -71,7 +71,7 @@ assert.equal(get().totals().accuracy,50);
 item={side:'UP',score:100,price:100,lastTs:t0+1200};
 assert.equal(get().onStrong(asset('BTCUSD_OTC'),item).opened,true);
 clock.now=(t0+1801)*1000;
-const draw=get().onFeed('BTCUSD_OTC',[{ts:t0+1200,c:100},{ts:t0+1800,c:100}],clock.now,true);
+const draw=get().onFeed('BTCUSD_OTC',[{ts:t0+1200,c:100},{ts:t0+1560,c:100},{ts:t0+1800,c:100}],clock.now,true);
 assert.equal(draw[0].status,'DRAW');
 assert.equal(draw[0].pnl,0);
 assert.equal(get().getWallet().balance,9980);
@@ -107,7 +107,7 @@ assert.equal(get().getWallet().armed.length,0);
 assert.equal(notifications.length,1,'Only queued 100/100 trade entry sends notification');
 assert.equal(notifications[0][2],'100');
 clock.now=(t0+3601)*1000;
-const delayedWin=get().onFeed('USDJPY_OTC',[{ts:t0+2700,c:100.5},{ts:t0+3600,c:101}],clock.now,true);
+const delayedWin=get().onFeed('USDJPY_OTC',[{ts:t0+2700,c:100.5},{ts:t0+3360,c:101},{ts:t0+3600,c:101}],clock.now,true);
 assert.equal(delayedWin[0].status,'WIN');
 assert.equal(get().getWallet().balance,10160);
 assert.equal(notifications.length,1,'Virtual WIN must not notify; entry only');
