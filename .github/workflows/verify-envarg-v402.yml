@@ -1,0 +1,39 @@
+name: Verify Envarg V4.0.2 Installable APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [v4-0-2-olymp-search-assist]
+    paths:
+      - '.github/workflows/verify-envarg-v402.yml'
+      - 'olymp-otc-multiscan/**'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build signed debug APK
+        working-directory: olymp-otc-multiscan
+        run: gradle --no-daemon assembleDebug
+      - name: Verify signing and package
+        run: |
+          set -eux
+          APK=olymp-otc-multiscan/app/build/outputs/apk/debug/app-debug.apk
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -n 1)"
+          "$APKSIGNER" verify --verbose --print-certs "$APK"
+          "$AAPT" dump badging "$APK" | tee /tmp/badging.txt
+          grep -q "package: name='com.envarg.otcmultiscan.v4search'" /tmp/badging.txt
+          unzip -t "$APK" | tail -n 1
+          cp "$APK" Envarg-OTC-Multi-V4.0.2-Verified.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Envarg-OTC-Multi-V4.0.2-Verified
+          path: Envarg-OTC-Multi-V4.0.2-Verified.apk
+          retention-days: 30
