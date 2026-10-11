@@ -17,6 +17,7 @@ const PRIORITY_MIN_GAP=15000; // avoid duplicate immediate requests
 const SCAN_OFFSET=12000; // aim for shortly after each 5-minute source boundary
 const ALERT_FRESHNESS=420000; // 5m last-close quotes may reach us one cycle late
 const REQUIRED_SCORE=100; // strict indicator agreement, NOT a predicted win rate
+// Filter intentionally blocks some 100/100 signals; this does not recalibrate score to win probability.
 let inFlight=false,startedAt=0,completedAt=0,lastStart=0,lastFullScan=0,lastPriorityScan=0,
     activeScanSymbols=[],activeScanKind='full',priorityCursor=0,lastCompletedScanSize=32,lastCompletedScanKind='full',
     lastCycle=Math.floor((Date.now()-SCAN_OFFSET)/POLL_INTERVAL),
@@ -142,6 +143,36 @@ function candleAnalysis(points){
  const strong=side!=='NONE'&&blockers.length===0;
  return {valid:true,score,side,strong,rsi,oscillator,volPct,trendGap,gap,hist,reason:strong?'All main indicators aligned':blockers.slice(0,3).join(' · ')};
 }
+// Conservative experimental gate. This is a trade-reduction filter, NOT a win guarantee.
+// Use only candles available at detection, never future result candles.
+function conservativeGate(asset,points,result,now){
+ if(!result.valid||!result.strong||result.score!==REQUIRED_SCORE)return {pass:false,reason:'INDICATORS BELOW 100'};
+ const p=points.map(x=>x.c),n=p.length;
+ if(n<80)return {pass:false,reason:'NEED 80 HISTORIC 5m CANDLES'};
+ const changes=[];
+ for(let i=n-16;i<n;i++)changes.push(Math.abs(p[i]-p[i-1])/p[i-1]*100);
+ const avg=changes.reduce((a,b)=>a+b,0)/changes.length;
+ const lastMove=(p[n-1]-p[n-2])/p[n-2]*100;
+ const dir=result.side==='UP'?1:-1;
+ const move5=(p[n-1]-p[n-6])/p[n-6]*100;
+ const move3=(p[n-1]-p[n-4])/p[n-4]*100;
+ if(avg<0.015)return {pass:false,reason:'CHOP / TOO LITTLE MOVEMENT'};
+ if(avg>0.45)return {pass:false,reason:'EXCESSIVE 5m VOLATILITY'};
+ if(lastMove*dir<=0)return {pass:false,reason:'LAST CLOSED CANDLE OPPOSES SIGNAL'};
+ if(move3*dir<=0||move5*dir<=0)return {pass:false,reason:'3-5 CANDLE DIRECTION NOT CONFIRMED'};
+ if(Math.abs(lastMove)>Math.max(0.12,avg*2.2))return {pass:false,reason:'EXTENDED CANDLE / CHASING MOVE'};
+ const wallet=PAPER.getWallet();
+ const settled=wallet.trades.filter(t=>t.symbol===asset.symbol&&(t.status==='WIN'||t.status==='LOSS'))
+   .sort((a,b)=>(b.settledAt||0)-(a.settledAt||0));
+ const recent=settled.filter(t=>now-(t.settledAt||0)<24*3600000);
+ if(recent.length>=2&&recent[0].status==='LOSS'&&recent[1].status==='LOSS')
+   return {pass:false,reason:'2 RECENT LOSSES / 24h CURRENCY PAUSE'};
+ if(recent.length&&recent[0].status==='LOSS'&&now-(recent[0].settledAt||0)<3600000)
+   return {pass:false,reason:'1h COOLDOWN AFTER LOSS'};
+ if(wallet.trades.some(t=>t.symbol===asset.symbol&&t.side===result.side&&now-t.openedAt<1800000))
+   return {pass:false,reason:'REPEATED SAME-DIRECTION SIGNAL / 30m COOLDOWN'};
+ return {pass:true,reason:'Conservative trend and loss-history checks passed'};
+}
 function latestMatches(){
  const now=Date.now();
  return ASSETS.map(a=>({asset:a,...STATES[a.symbol]})).filter(a=>a.strong&&a.score===REQUIRED_SCORE&&a.status==='LIVE'&&now-a.lastTs*1000<=ALERT_FRESHNESS).sort((a,b)=>b.score-a.score||a.asset.name.localeCompare(b.asset.name));
@@ -173,9 +204,11 @@ window.nativeAssetResult=function(symbol,rawText){
   PAPER.onFeed(symbol,points,now,false); // no result alerts: signal entry alerts only
   PAPER.onQuote(symbol,points,now,notifications); // fills previously queued 100/100 signal
   const result=candleAnalysis(points);
-  const qualified=result.valid&&result.strong&&result.score===REQUIRED_SCORE;
+  const baseQualified=result.valid&&result.strong&&result.score===REQUIRED_SCORE;
+  const gate=baseQualified?conservativeGate(INDEX[symbol],points,result,now):{pass:false,reason:result.reason};
+  const qualified=baseQualified&&gate.pass;
   Object.assign(old,{status:result.valid?'LIVE':'WARMUP',lastTs:last.ts,price:last.c,score:result.score||0,
-    side:result.side||'NONE',strong:qualified,error:'',reason:result.valid&&!qualified&&result.strong?'Score '+result.score+'/100 (only 100/100 accepted)':result.reason,dataCount:points.length,frame:300,checkedAt:now});
+    side:result.side||'NONE',strong:qualified,error:'',reason:baseQualified&&!qualified?'FILTERED: '+gate.reason:result.valid&&!qualified&&result.strong?'Score '+result.score+'/100 (only 100/100 accepted)':result.reason,dataCount:points.length,frame:300,checkedAt:now});
   if(qualified&&age<=ALERT_FRESHNESS)addSignal(INDEX[symbol],old);
  }catch(ex){
   Object.assign(old,{status:'ERROR',strong:false,side:'NONE',score:0,checkedAt:now,error:String(ex.message||ex).slice(0,160),reason:'Unable to validate feed'});
