@@ -51,6 +51,11 @@ assert.equal(paper().totals().open,1,'Provisional WIN is still OPEN');
 assert.equal(paper().totals().wins,0,'Provisional WIN must not count as WIN');
 
 clock.now=(base+601)*1000;
+paper().renderOpen();
+assert(el('#paperOpenList').innerHTML.includes('00:00'),'Countdown reaches zero without fabricating a result');
+assert(el('#paperOpenList').innerHTML.includes('RESULT PENDING'),'Wait for verified expiry data');
+assert(!el('#paperOpenList').innerHTML.includes('INDICATIVE WIN'),'A pre-expiry preview must not masquerade as a final WIN after expiry');
+assert.equal(paper().totals().open,1,'Trade remains open until validated settlement');
 const finished=paper().onFeed(asset.symbol,[{ts:base,c:100},{ts:base+300,c:101},{ts:base+600,c:99}],clock.now);
 assert.equal(finished.length,1);
 assert.equal(finished[0].status,'LOSS','Final quote overrides tentative WIN');
