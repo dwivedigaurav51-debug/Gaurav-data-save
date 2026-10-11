@@ -183,7 +183,7 @@ window.nativeAssetResult=function(symbol,rawText){
  updateUI();
 };
 window.nativeAssetError=function(symbol,error){
- if(!inFlight||!INDEX[symbol]||seenResults.has(symbol))return;
+ if(!inFlight||!INDEX[symbol]||!activeScanSymbols.includes(symbol)||seenResults.has(symbol))return;
  seenResults.add(symbol);
  Object.assign(STATES[symbol],{status:'ERROR',strong:false,side:'NONE',score:0,error:String(error).slice(0,160),checkedAt:Date.now(),reason:'Source request failed'});
  updateUI();
