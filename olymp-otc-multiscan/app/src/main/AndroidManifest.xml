@@ -2,6 +2,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <queries><package android:name="com.ticno.olymptrade" /></queries>
     <application
         android:label="Envarg OTC Multi Scanner"
         android:icon="@drawable/ic_otcscanner"
