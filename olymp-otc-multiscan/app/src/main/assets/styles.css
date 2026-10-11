@@ -88,3 +88,14 @@
 @media(max-width:680px){.paperstats{grid-template-columns:repeat(2,minmax(0,1fr))}.foldbody{padding:10px}.result-modal{padding:24px 14px}.result-big{font-size:64px}}
 
 .save-warning{display:none;margin:9px 0;padding:10px;border-radius:11px;font-size:12px;font-weight:700}.save-warning:not(:empty){display:block;background:#4b2c2d;border:1px solid #f18585;color:#fff0e5}
+
+/* V4 Fast: immediate paper-signal banner and lightweight pending-entry check */
+.fast-paper-strip{border:1px solid #256479;background:linear-gradient(120deg,#0b3041,#0b2638);padding:12px;border-radius:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 14px}
+.fast-paper-strip strong{min-width:180px;flex:1;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+.fast-paper-strip small{display:block;flex-basis:100%;font-size:10px;color:#98bdc9;line-height:1.4}
+.fast-paper-strip .secondary{margin:0;padding:9px 11px;font-size:11px;white-space:nowrap}
+.fast-paper-strip .secondary:disabled{opacity:.4;cursor:not-allowed}
+.paper-entry-live{color:#3ef0ba}
+.paper-entry-wait{color:#ffe19b}
+.paper-entry-idle{color:#bfd4e5}
+@media(max-width:450px){.fast-paper-strip .secondary{width:100%}}
