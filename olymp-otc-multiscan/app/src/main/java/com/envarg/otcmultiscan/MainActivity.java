@@ -5,6 +5,10 @@ import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Intent;
+import android.widget.Toast;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -95,6 +99,27 @@ public final class MainActivity extends Activity {
                 } finally {
                     scanning.set(false);
                     postJs("window.nativeScanDone()");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void openOlymptrade(String symbol) {
+            if (symbol == null || !SUPPORTED.contains(symbol)) return;
+            runOnUiThread(() -> {
+                String label = labelForSymbol(symbol);
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (clipboard != null) clipboard.setPrimaryClip(ClipData.newPlainText("OTC signal currency", label));
+                Intent launch = getPackageManager().getLaunchIntentForPackage("com.ticno.olymptrade");
+                if (launch == null) {
+                    Toast.makeText(MainActivity.this, "Olymptrade ऐप नहीं मिली। करेंसी कॉपी: " + label, Toast.LENGTH_LONG).show();
+                    return;
+                }
+                try {
+                    startActivity(launch);
+                    Toast.makeText(MainActivity.this, label + " कॉपी है। Olymptrade में यही करेंसी चुनें।", Toast.LENGTH_LONG).show();
+                } catch (Exception ex) {
+                    Toast.makeText(MainActivity.this, "Olymptrade नहीं खुल सकी। करेंसी कॉपी: " + label, Toast.LENGTH_LONG).show();
                 }
             });
         }
