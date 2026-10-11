@@ -7,13 +7,21 @@ window.PaperVirtual=(()=>{
  const SIGNAL_MAX_AGE=420000,ARM_TIMEOUT=900000,REQUIRED_SCORE=100;
  const $=s=>document.querySelector(s);
  const getSaved=()=>{try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}};
- const fallback=()=>({version:3,initial:INITIAL,balance:INITIAL,auto:true,trades:[],skipped:[],armed:[]});
+ const fallback=()=>({version:3,initial:INITIAL,balance:INITIAL,auto:true,autoRefill:true,refillTotal:0,topups:[],trades:[],skipped:[],armed:[]});
  let wallet=getSaved();
  if(!wallet||wallet.version!==3||!Array.isArray(wallet.trades)||!Number.isFinite(wallet.balance))wallet=fallback();
  wallet.skipped=Array.isArray(wallet.skipped)?wallet.skipped:[];
  wallet.armed=Array.isArray(wallet.armed)?wallet.armed:[];
  wallet.auto=wallet.auto!==false;
- const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(wallet))}catch(_){}};
+ wallet.autoRefill=wallet.autoRefill!==false;
+ wallet.refillTotal=Number.isFinite(wallet.refillTotal)?wallet.refillTotal:0;
+ wallet.topups=Array.isArray(wallet.topups)?wallet.topups:[];
+ const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(wallet));saveWarning=''}catch(e){saveWarning='Device storage is full — trades may not persist after restart.'}};
+ let saveWarning='';
+ let historyVisible=25;
+ const resultQueue=[];
+ let resultTimer=null;
+ let resultShown=false;
  const fmt=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:2});
  const price=n=>Number.isFinite(n)?Number(n).toLocaleString('en-US',{minimumFractionDigits:4,maximumFractionDigits:7}):'—';
  const time=ms=>ms?new Date(ms).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'—';
@@ -24,6 +32,16 @@ window.PaperVirtual=(()=>{
    return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
  };
  function openCount(){return wallet.trades.filter(t=>t.status==='OPEN').length}
+ function ensureDemoFunds(now){
+  if(wallet.balance>=STAKE)return true;
+  if(!wallet.autoRefill)return false;
+  const amount=INITIAL;
+  wallet.balance+=amount;
+  wallet.refillTotal+=amount;
+  wallet.topups.unshift({at:now,amount});
+  save();
+  return wallet.balance>=STAKE;
+ }
  function skip(asset,reason,now){
   wallet.skipped.unshift({symbol:asset.symbol,name:asset.name,reason,time:now});
   wallet.skipped=wallet.skipped.slice(0,40);save();
@@ -39,7 +57,7 @@ window.PaperVirtual=(()=>{
   if(!Number.isFinite(lastQuote.c)||lastQuote.c<=0||!Number.isFinite(sourceMs)||sourceMs<=0)return fail('INVALID SOURCE PRICE');
   if(quoteAge< -10000||quoteAge>=SIGNAL_MAX_AGE)return fail('QUOTE NOT FRESH ENOUGH TO OBSERVE');
   if(wallet.trades.some(t=>t.status==='OPEN'&&t.symbol===asset.symbol))return fail('ACTIVE TRADE on same currency');
-  if(wallet.balance<STAKE)return fail('VIRTUAL BALANCE BELOW ₹200');
+  if(!ensureDemoFunds(detectedAt))return fail('VIRTUAL BALANCE BELOW ₹200 (AUTO REFILL OFF)');
   const signalTs=Number(signal.lastTs),id=asset.symbol+':100:'+signalTs;
   if(wallet.trades.some(t=>t.id===id))return fail('100/100 SIGNAL ALREADY TRADED');
   const trade={
@@ -65,7 +83,7 @@ window.PaperVirtual=(()=>{
   if(wallet.trades.some(t=>t.status==='OPEN'&&t.symbol===asset.symbol))return fail('ACTIVE TRADE on same currency');
   if(wallet.armed.some(t=>t.symbol===asset.symbol&&t.sourceTs===st.lastTs))return fail('ALREADY WAITING FOR FRESH ENTRY');
   if(wallet.trades.some(t=>t.symbol===asset.symbol&&t.signalSourceTs===st.lastTs))return fail('ALREADY TRADED 100/100 SIGNAL');
-  if(wallet.balance<STAKE)return fail('VIRTUAL BALANCE BELOW ₹200');
+  if(wallet.balance<STAKE&&!wallet.autoRefill)return fail('VIRTUAL BALANCE BELOW ₹200 (AUTO REFILL OFF)');
   if(age<MAX_QUOTE_AGE){
    return openPaper(asset,st,{ts:st.lastTs,c:st.price},detectedAt);
   }
@@ -156,8 +174,9 @@ window.PaperVirtual=(()=>{
   const voids=all.filter(t=>t.status==='VOID').length;
   const open=all.filter(t=>t.status==='OPEN').length;
   const armed=wallet.armed.length;
+  const trades=all.length;
   const pnl=all.filter(t=>Number.isFinite(t.pnl)).reduce((sum,t)=>sum+t.pnl,0);
-  return {wins,losses,draws,voids,open,armed,pnl,accuracy:wins+losses?wins/(wins+losses)*100:null};
+  return {wins,losses,draws,voids,open,armed,trades,pnl,accuracy:wins+losses?wins/(wins+losses)*100:null};
  }
  function tradeCard(t,isOpen){
   const status=safe(t.status),p=t.pnl;
@@ -209,13 +228,20 @@ window.PaperVirtual=(()=>{
   $('#paperPnl').className=t.pnl>0?'win':t.pnl<0?'lose':'';
   $('#paperOpenCount').textContent=t.open;
   $('#paperArmedCount').textContent=t.armed;
+  $('#paperTotalTrades').textContent=t.trades.toLocaleString('en-IN');
+  $('#paperRefillTotal').textContent=fmt(wallet.refillTotal);
+  $('#paperRefill').checked=!!wallet.autoRefill;
   $('#paperAuto').checked=!!wallet.auto;
   $('#paperTotals').textContent=(t.wins+t.losses)+' completed W/L · '+t.draws+' DRAW · '+t.voids+' VOID · '+t.open+' OPEN · '+t.armed+' WAITING ENTRY';
   renderOpen();
   const closed=wallet.trades.filter(t=>t.status!=='OPEN');
+  $('#paperHistoryCount').textContent=closed.length.toLocaleString('en-IN')+' completed · '+t.open+' open · tap to view';
   $('#paperHistory').innerHTML=closed.length
-   ?closed.slice(0,60).map(t=>tradeCard(t,false)).join('')
+   ?closed.slice(0,historyVisible).map(t=>tradeCard(t,false)).join('')
    :'<p class="empty">अभी कोई पूरी हुई virtual trade नहीं। खुली ट्रेड ऊपर दिखाई देगी।</p>';
+  $('#paperHistoryMore').hidden=closed.length<=historyVisible;
+  $('#paperHistoryMore').textContent='Show older trades ('+Math.min(50,Math.max(0,closed.length-historyVisible))+' more)';
+  $('#paperSaveWarning').textContent=saveWarning;
   const groups={};
   for(const row of wallet.trades){
    if(!groups[row.symbol])groups[row.symbol]={name:row.name,w:0,l:0,d:0,v:0,o:0,pnl:0};
@@ -234,13 +260,16 @@ window.PaperVirtual=(()=>{
   $('#paperSkipped').textContent=wallet.skipped.length+' skipped entries'+(wallet.skipped[0]?' · Last: '+wallet.skipped[0].name+' — '+wallet.skipped[0].reason:'');
  }
  $('#paperAuto').checked=wallet.auto;
+ $('#paperRefill').checked=wallet.autoRefill;
+ $('#paperRefill').addEventListener('change',()=>{wallet.autoRefill=$('#paperRefill').checked;save();render()});
+ $('#paperHistoryMore').addEventListener('click',()=>{historyVisible+=50;render()});
  $('#paperAuto').addEventListener('change',()=>{
    wallet.auto=$('#paperAuto').checked;save();render();
  });
  $('#paperReset').addEventListener('click',()=>{
    if(openCount()||wallet.armed.length){alert('Open या WAITING ENTRY paper signal पहले पूरा होने दो।');return}
    if(!confirm('Reset ONLY Multi Scanner virtual balance, trade history and accuracy to ₹10,000?'))return;
-   wallet=fallback();save();render();
+   wallet=fallback();historyVisible=25;save();render();
  });
  return {onStrong,onQuote,onFeed,getTrade,isQueued,totals,render,renderOpen,expireQueued,getWallet:()=>wallet};
 })();
