@@ -68,6 +68,20 @@ public final class MainActivity extends Activity {
     private int notificationId = 9000;
 
     public final class Bridge {
+        @JavascriptInterface public void startBackgroundMonitor() {
+            runOnUiThread(() -> {
+                try { startForegroundService(new Intent(MainActivity.this, BackgroundScanService.class).setAction(BackgroundScanService.START));
+                    Toast.makeText(MainActivity.this, "Background feed monitor started", Toast.LENGTH_SHORT).show(); }
+                catch (Exception ex) { Toast.makeText(MainActivity.this, "Monitor could not start", Toast.LENGTH_LONG).show(); }
+            });
+        }
+        @JavascriptInterface public void stopBackgroundMonitor() {
+            runOnUiThread(() -> startService(new Intent(MainActivity.this, BackgroundScanService.class).setAction(BackgroundScanService.STOP)));
+        }
+        @JavascriptInterface public String backgroundMonitorStatus() {
+            android.content.SharedPreferences p=getSharedPreferences("monitor_state", MODE_PRIVATE);
+            return (p.getBoolean("running",false)?"RUNNING":"STOPPED")+" · "+p.getString("feed_status","No checks yet");
+        }
         @JavascriptInterface
         public void scanAssets(String csv) {
             if (csv == null) return;
