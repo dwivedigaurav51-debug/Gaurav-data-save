@@ -18,6 +18,7 @@
    <button id="scanBtn" class="primary" type="button">↻ Scan Now</button>
   </header>
 
+  <section class="card" style="padding:16px;margin-bottom:14px"><h2>Background Feed Monitor (Beta)</h2><p class="note">हर 5 मिनट feed connection जांचता है। अभी background signal generator नहीं है और वास्तविक ट्रेड नहीं लगाता।</p><button class="primary" onclick="window.MultiBridge?.startBackgroundMonitor()">Start Monitor</button> <button class="secondary" onclick="window.MultiBridge?.stopBackgroundMonitor()">Stop</button><p id="bgMonitorStatus" class="note">Status: —</p><button class="secondary" onclick="document.getElementById('bgMonitorStatus').textContent=window.MultiBridge?.backgroundMonitorStatus?.()||'Unavailable'">Refresh Status</button></section>
   <section class="statusbar card" aria-live="polite">
    <span id="scanDot" class="dot"></span>
    <div class="grow"><strong id="scanStatus">Scanner ready</strong>
