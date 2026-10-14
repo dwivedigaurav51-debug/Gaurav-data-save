@@ -15,8 +15,8 @@ public final class BackgroundScanService extends Service {
  private volatile boolean running=false;
  private ScheduledFuture<?> job;
  @Override public void onCreate(){super.onCreate();
-  NotificationChannel c=new NotificationChannel(CHANNEL,"OTC Background Monitor",NotificationManager.IMPORTANCE_LOW);
-  ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(c);
+  if(Build.VERSION.SDK_INT>=26){NotificationChannel c=new NotificationChannel(CHANNEL,"OTC Background Monitor",NotificationManager.IMPORTANCE_LOW);
+  ((NotificationManager)getSystemService(NOTIFICATION_SERVICE)).createNotificationChannel(c);}
  }
  @Override public int onStartCommand(Intent intent,int flags,int startId){
   if(intent!=null&&STOP.equals(intent.getAction())){stopMonitor();return START_NOT_STICKY;}
@@ -34,7 +34,8 @@ public final class BackgroundScanService extends Service {
   PendingIntent stopPi=PendingIntent.getService(this,2,stop,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
   Intent open=new Intent(this,MainActivity.class);
   PendingIntent openPi=PendingIntent.getActivity(this,3,open,PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
-  return new Notification.Builder(this,CHANNEL).setSmallIcon(android.R.drawable.stat_notify_sync)
+  Notification.Builder builder=Build.VERSION.SDK_INT>=26?new Notification.Builder(this,CHANNEL):new Notification.Builder(this);
+  return builder.setSmallIcon(android.R.drawable.stat_notify_sync)
    .setContentTitle("Envarg OTC · Background Monitor").setContentText(message)
    .setContentIntent(openPi).addAction(android.R.drawable.ic_menu_close_clear_cancel,"Stop",stopPi)
    .setOngoing(true).build();
@@ -55,7 +56,7 @@ public final class BackgroundScanService extends Service {
  }
  private void stopMonitor(){running=false;if(job!=null)job.cancel(true);
   getSharedPreferences(PREF,MODE_PRIVATE).edit().putBoolean("running",false).apply();
-  stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();
+  if(Build.VERSION.SDK_INT>=24)stopForeground(STOP_FOREGROUND_REMOVE);else stopForeground(true);stopSelf();
  }
  @Override public void onTimeout(int startId,int fgsType){stopMonitor();}
  @Override public void onDestroy(){running=false;if(job!=null)job.cancel(true);executor.shutdownNow();
