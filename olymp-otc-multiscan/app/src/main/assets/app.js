@@ -296,6 +296,17 @@ function updateUI(){
   '<div><div class="side '+(row.side==='DOWN'?'down':'')+'">'+esc(row.side)+'</div><div class="score">'+Number(row.score||0)+'/100</div></div></div>';
  }).join(''):'<p class="empty">अभी कोई Strong Signal दर्ज नहीं है।</p>';
  const checked=ASSETS.filter(a=>seenResults.has(a.symbol)).length;
+ const valid=ASSETS.filter(a=>STATES[a.symbol].status==='LIVE').length;
+ const errors=ASSETS.filter(a=>STATES[a.symbol].status==='ERROR').length;
+ const qualified=ASSETS.filter(a=>STATES[a.symbol].strong).length;
+ const stale=completedAt>0&&Date.now()-completedAt>11*60*1000;
+ const health=inFlight?'SCANNING':stale?'STALE — CHECK APP':!scanDoneCount?'WAITING':valid===0?'FEED ERROR':qualified===0?'NO SIGNAL — SCAN OK':'SIGNALS FOUND';
+ $('#healthState').textContent=health;
+ $('#healthDetail').textContent=inFlight?'स्कैन चल रहा है':stale?'पिछले 11 मिनट से सफल स्कैन नहीं हुआ':valid===0&&scanDoneCount?'कोई वैध डेटा नहीं मिला; सिग्नल पर भरोसा न करें':qualified===0&&scanDoneCount?'डेटा मिला, लेकिन अभी कोई योग्य सिग्नल नहीं':'Last completed: '+prettyTime(completedAt);
+ $('#healthChecked').textContent=checked+'/'+ASSETS.length;
+ $('#healthValid').textContent=valid;
+ $('#healthErrors').textContent=errors;
+ $('#healthSignals').textContent=qualified;
  $('#scanBtn').disabled=inFlight;
  $('#scanBtn').textContent=inFlight?'Scanning…':'↻ Scan Now';
  $('#scanStatus').textContent=inFlight?'Scanning '+checked+'/'+ASSETS.length+' OTC assets':
