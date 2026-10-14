@@ -70,7 +70,8 @@ public final class MainActivity extends Activity {
     public final class Bridge {
         @JavascriptInterface public void startBackgroundMonitor() {
             runOnUiThread(() -> {
-                try { startForegroundService(new Intent(MainActivity.this, BackgroundScanService.class).setAction(BackgroundScanService.START));
+                try { Intent monitorIntent=new Intent(MainActivity.this, BackgroundScanService.class).setAction(BackgroundScanService.START);
+                    if(Build.VERSION.SDK_INT>=26)startForegroundService(monitorIntent);else startService(monitorIntent);
                     Toast.makeText(MainActivity.this, "Background feed monitor started", Toast.LENGTH_SHORT).show(); }
                 catch (Exception ex) { Toast.makeText(MainActivity.this, "Monitor could not start", Toast.LENGTH_LONG).show(); }
             });
