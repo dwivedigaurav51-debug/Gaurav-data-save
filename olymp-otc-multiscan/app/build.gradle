@@ -8,8 +8,8 @@ android {
         applicationId "com.envarg.otcmultiscan.v4search"
         minSdk 24
         targetSdk 35
-        versionCode 402
-        versionName "4.0.2-search"
+        versionCode 403
+        versionName "4.0.3-beta"
     }
     buildTypes {
         debug { minifyEnabled false }
