@@ -134,6 +134,13 @@ function candleAnalysis(points){
   if(rsi<=35||rsi>52)blockers.push('RSI not in safe DOWN zone');
   if(price<=lower)blockers.push('Price below lower Bollinger');
  }
+ // Additional conservative filters; effectiveness must be checked on unseen paper trades.
+ const recent=close.slice(-7),recentRange=Math.max(...recent)-Math.min(...recent);
+ const rangePct=recentRange/price*100;
+ const momentum3=(price-close.at(-4))/price*100;
+ if(rangePct<.018)blockers.push('Sideways: last 7 candles too narrow');
+ if(side==='UP'&&momentum3<=0)blockers.push('3-candle momentum against UP');
+ if(side==='DOWN'&&momentum3>=0)blockers.push('3-candle momentum against DOWN');
  if(volPct>=.7||volPct<=.008)blockers.push('Volatility not within safe range');
  if(gap<22)blockers.push('UP/DOWN score gap too small');
  if(score<80)blockers.push('Score '+score+' below 80');
@@ -302,7 +309,7 @@ function updateUI(){
  const stale=completedAt>0&&Date.now()-completedAt>11*60*1000;
  const health=inFlight?'SCANNING':stale?'STALE — CHECK APP':!scanDoneCount?'WAITING':valid===0?'FEED ERROR':qualified===0?'NO SIGNAL — SCAN OK':'SIGNALS FOUND';
  $('#healthState').textContent=health;
- $('#healthDetail').textContent=inFlight?'स्कैन चल रहा है':stale?'पिछले 11 मिनट से सफल स्कैन नहीं हुआ':valid===0&&scanDoneCount?'कोई वैध डेटा नहीं मिला; सिग्नल पर भरोसा न करें':qualified===0&&scanDoneCount?'डेटा मिला, लेकिन अभी कोई योग्य सिग्नल नहीं':'Last completed: '+prettyTime(completedAt);
+ $('#healthDetail').textContent=inFlight?'स्कैन चल रहा है':stale?'पिछले 11 मिनट से स्कैन पूरा नहीं हुआ':valid===0&&scanDoneCount?'कोई वैध डेटा नहीं मिला; सिग्नल पर भरोसा न करें':qualified===0&&scanDoneCount?'डेटा मिला, लेकिन अभी कोई योग्य सिग्नल नहीं':'Last completed: '+prettyTime(completedAt);
  $('#healthChecked').textContent=checked+'/'+ASSETS.length;
  $('#healthValid').textContent=valid;
  $('#healthErrors').textContent=errors;
