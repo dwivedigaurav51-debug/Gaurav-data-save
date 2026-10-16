@@ -1,0 +1,16 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const el={onclick:null};const context={console,crypto:require('crypto').webcrypto,document:{querySelector:()=>el,addEventListener:()=>{}},window:{},localStorage:{getItem:()=>null},indexedDB:{open:()=>({})},navigator:{},setTimeout:()=>{},structuredClone,Date};vm.createContext(context);vm.runInContext(fs.readFileSync(__dirname+'/public/app.js','utf8'),context);
+const run=s=>vm.runInContext(s,context);
+assert.equal(run("money('0.10')+money('0.20')"),30);
+assert.throws(()=>run("money('1.999')"));assert.throws(()=>run("money('-10')"));
+run(`state={version:1,people:[{id:'p',name:'Nitesh',phone:'9999999999',color:'#6655d6',opening:10000,qr:null}],entries:[{id:'1',pid:'p',kind:'in',amount:1000000,date:'2026-10-01',note:'received',created:1,deleted:false},{id:'2',pid:'p',kind:'out',amount:300000,date:'2026-10-02',note:'paid',created:2,deleted:false},{id:'3',pid:'p',kind:'fee',amount:10000,date:'2026-10-03',note:'fee',created:3,deleted:false}],audit:[],emails:[],defaultEmail:''}`);
+assert.equal(run("sums('p').balance"),700000);
+run("state.entries[1].amount=200000");assert.equal(run("sums('p').balance"),800000);
+run("state.entries[1].deleted=true");assert.equal(run("sums('p').balance"),1000000);
+run("state.entries[1].deleted=false");assert.equal(run("sums('p').balance"),800000);
+assert.match(run("statement('p','2026-10-02','2026-10-03')"),/10,100.00/);
+assert.match(run("statement('p','2026-10-02','2026-10-03')"),/8,000.00/);
+assert.equal(run("validBackup(JSON.parse(JSON.stringify(state))).people[0].name"),'Nitesh');
+assert.throws(()=>run("validBackup({...state,entries:[{...state.entries[0],pid:'unknown'}]})"));
+assert.equal(run("esc('<script>')"),'&lt;script&gt;');
+console.log('PASS: exact paise, received/Less/fee, edits, trash/restore, date opening/closing balances, backup validation, escaping');

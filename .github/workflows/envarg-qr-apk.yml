@@ -1,0 +1,36 @@
+name: Envarg QR Hisab APK
+on:
+  push:
+    branches: [envarg-qr-hisab]
+    paths: ['qr-hisab/**', '.github/workflows/envarg-qr-apk.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Package offline app
+        run: |
+          mkdir -p qr-hisab/android/app/src/main/assets
+          cp qr-hisab/public/* qr-hisab/android/app/src/main/assets/
+          node --check qr-hisab/public/app.js
+      - name: Build installable APK
+        working-directory: qr-hisab/android
+        run: gradle --no-daemon assembleDebug
+      - name: Name APK
+        run: cp qr-hisab/android/app/build/outputs/apk/debug/app-debug.apk Envarg-QR-Hisab-v1.0.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Envarg-QR-Hisab-v1.0-APK
+          path: Envarg-QR-Hisab-v1.0.apk
+          retention-days: 30

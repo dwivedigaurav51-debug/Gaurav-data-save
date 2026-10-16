@@ -1,0 +1,4 @@
+# Envarg QR Hisab
+Hindi offline-first QR ledger. This separate branch preserves the original repository history and files. App sources are under qr-hisab/. Android build is the Envarg QR Hisab APK workflow.
+
+Amounts use integer paise. Entries are manual; QR upload does not read bank payments. Records and photos use IndexedDB on device. Export JSON backups regularly. PIN is a screen access lock, not data encryption. Backup excludes PIN. No biometric unlock in this version. Android email/share produces a PDF; choose Gmail and tap Send. Full backups include images and audit history. Debug APK is signed for personal installation; keep the same signing identity for future updates. GitHub-hosted debug builds can use different keys between runs; export backup before changing builds. No paid service or bank login required. Hatchable hosting remains governed by the account's free quota.
