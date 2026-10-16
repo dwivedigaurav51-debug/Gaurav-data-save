@@ -16,6 +16,8 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -24,6 +26,7 @@ jobs:
           mkdir -p qr-hisab/android/app/src/main/assets
           cp qr-hisab/public/* qr-hisab/android/app/src/main/assets/
           node --check qr-hisab/public/app.js
+          node qr-hisab/check.cjs
       - name: Build installable APK
         working-directory: qr-hisab/android
         run: gradle --no-daemon assembleDebug
